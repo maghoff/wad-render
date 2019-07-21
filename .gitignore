@@ -1,0 +1,3 @@
+/target
+**/*.rs.bk
+wad_render.gc.wasm

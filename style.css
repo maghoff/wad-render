@@ -1,0 +1,18 @@
+html {
+    background: grey;
+    padding: 0;
+    margin: 0;
+}
+
+body {
+    background: white;
+    width: 1920px;
+    height: 1080px;
+    padding: 0;
+    margin: 0;
+}
+
+#screen {
+    width: 640px;
+    height: 480px;
+}

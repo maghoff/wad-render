@@ -1,0 +1,11 @@
+[package]
+name = "wad-render"
+version = "0.1.0"
+authors = ["Magnus Hovland Hoff <maghoff@gmail.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wee_alloc = "0.4.4"
