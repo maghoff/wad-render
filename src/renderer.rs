@@ -1,4 +1,4 @@
-use crate::util::*;
+use crate::{util::*, Input};
 use ndarray::prelude::*;
 use wad::Wad;
 use wad_gfx::Sprite;
@@ -15,11 +15,11 @@ impl<'a> State<'a> {
 
         State { playpal, titlepic }
     }
-}
 
-pub fn render(state: &State, crate::Input { buf, pal, .. }: crate::Input) {
-    pal.clone_from_slice(&state.playpal[0..768]);
+    pub fn render(&self, Input { buf, pal, .. }: Input) {
+        pal.clone_from_slice(&self.playpal[0..768]);
 
-    let mut screen = ArrayViewMut2::from_shape((200, 320), buf).unwrap();
-    put_sprite(&mut screen, 0, 0, &state.titlepic);
+        let mut screen = ArrayViewMut2::from_shape((200, 320), buf).unwrap();
+        put_sprite(&mut screen, 0, 0, &self.titlepic);
+    }
 }

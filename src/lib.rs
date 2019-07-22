@@ -59,7 +59,7 @@ pub fn render(state: *mut renderer::State, screen_ptr: *mut u8) {
 
     let input = Input { pal: &mut pal, buf: &mut framebuf };
 
-    renderer::render(&*state, input);
+    state.render(input);
 
     for (dst, src) in screen_slice.chunks_exact_mut(4).zip(framebuf.iter_mut()) {
         let col = *src as usize;
