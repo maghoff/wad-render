@@ -4,46 +4,45 @@ const WIDTH = 320;
 const HEIGHT = 200;
 const FRAME_BYTE_SIZE = WIDTH * HEIGHT * 4;
 
-function initCanvas(buffer, ptr) {
+function initCanvas() {
     const canvas = document.getElementById('screen');
+    return canvas.getContext('2d');
+}
 
-    const screenBuf = new Uint8ClampedArray(buffer, ptr, FRAME_BYTE_SIZE);
+function copyArrayBuffer(arrayBuffer, buffer, ptr) {
+    const src = new Uint8ClampedArray(arrayBuffer);
+    const dst = new Uint8ClampedArray(buffer, ptr, arrayBuffer.byteLength);
+    dst.set(src);
+}
+
+function renderFrame(mod, state, screen) {
+    mod.render(state, screen.ptr);
+
+    const screenBuf = new Uint8ClampedArray(mod.memory.buffer, screen.ptr, FRAME_BYTE_SIZE);
     const img = new ImageData(screenBuf, WIDTH, HEIGHT);
 
-    const ctx = canvas.getContext('2d');
-
-    return { ctx, img };
-}
-
-function allocate(mod) {
-    // Do all allocations up front, as they may invalidate mod.memory.buffer
-
-    const screen = mod.alloc(FRAME_BYTE_SIZE);
-
-    return { screen };
-}
-
-function renderFrame(mod, screen) {
-    mod.render(screen.ptr);
-
-    screen.ctx.putImageData(screen.img, 0, 0);
+    screen.ctx.putImageData(img, 0, 0);
 }
 
 async function init() {
-    const wasm = await WebAssembly.instantiateStreaming(fetch("wad_render.gc.wasm"));
+    const [wasm, wad] = await Promise.all([
+        WebAssembly.instantiateStreaming(fetch("wad_render.gc.wasm")),
+        fetch("doom1.wad").then(x => x.arrayBuffer()),
+    ]);
+
     const mod = wasm.instance.exports;
 
-    const ptr = allocate(mod);
-
-    const { ctx, img } = initCanvas(mod.memory.buffer, ptr.screen);
-
     let screen = {
-        ctx,
-        img,
-        ptr: ptr.screen,
+        ctx: initCanvas(),
+        ptr: mod.alloc(FRAME_BYTE_SIZE),
     };
 
-    renderFrame(mod, screen);
+    const wadPtr = mod.alloc(wad.byteLength);
+    copyArrayBuffer(wad, mod.memory.buffer, wadPtr);
+
+    const state = mod.init(wadPtr, wad.byteLength);
+
+    renderFrame(mod, state, screen);
 }
 
 init()

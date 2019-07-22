@@ -9,3 +9,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 wee_alloc = "0.4.4"
+wad = "0.3.2"
