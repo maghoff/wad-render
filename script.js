@@ -39,8 +39,9 @@ async function init() {
 
     const wadPtr = mod.alloc(wad.byteLength);
     copyArrayBuffer(wad, mod.memory.buffer, wadPtr);
+    const wadObject = mod.parse_wad(wadPtr, wad.byteLength);
 
-    const state = mod.init(wadPtr, wad.byteLength);
+    const state = mod.init(wadObject);
 
     renderFrame(mod, state, screen);
 }

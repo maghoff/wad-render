@@ -10,3 +10,5 @@ crate-type = ["cdylib"]
 [dependencies]
 wee_alloc = "0.4.4"
 wad = "0.3.2"
+wad-gfx = { git = "https://github.com/maghoff/wad-gfx.git" }
+ndarray = "0.12.1"
