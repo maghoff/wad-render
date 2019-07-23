@@ -1,6 +1,8 @@
+use cgmath::prelude::*;
+use cgmath::Vector2;
+use ndarray::prelude::*;
 use std::cmp::{max, min};
 use std::ops::Range;
-use ndarray::prelude::*;
 use wad_gfx::Sprite;
 
 pub fn add(r: Range<i32>, d: i32) -> Range<i32> {
@@ -36,5 +38,21 @@ pub fn put_sprite(trg: &mut ArrayViewMut2<u8>, pos_x: i16, pos_y: i16, sprite: &
                 trg[[y as usize, x as usize]] = span.pixels[(y - y_offset) as usize];
             }
         }
+    }
+}
+
+pub fn point(trg: &mut ArrayViewMut2<u8>, p: Vector2<f32>, col: u8) {
+    let p: Vector2<i32> = p.cast().unwrap();
+    let on_screen = p.x >= 0 && p.x < 320 && p.y >= 0 && p.y < 200;
+    if on_screen {
+        trg[[p.y as usize, p.x as usize]] = col;
+    }
+}
+
+pub fn line(trg: &mut ArrayViewMut2<u8>, a: Vector2<f32>, b: Vector2<f32>, col: u8) {
+    let d = b - a;
+    for i in 0..500 {
+        let p = a + i as f32 * d / 500.;
+        point(trg, p, col);
     }
 }
