@@ -56,3 +56,9 @@ pub fn line(trg: &mut ArrayViewMut2<u8>, a: Vector2<f32>, b: Vector2<f32>, col: 
         point(trg, p, col);
     }
 }
+
+pub fn fill(trg: &mut ArrayViewMut2<u8>, col: u8) {
+    for x in trg.iter_mut() {
+        *x = col;
+    }
+}

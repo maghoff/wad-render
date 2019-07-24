@@ -58,11 +58,10 @@ impl<'a> State<'a> {
         let fb = self.project(fb);
         let cb = self.project(cb);
 
-        line(screen, fa, fb, 0);
-        line(screen, ca, cb, 0);
-
-        line(screen, fa, ca, 0);
-        line(screen, fb, cb, 0);
+        // line(screen, fa, fb, 4);
+        // line(screen, ca, cb, 4);
+        // line(screen, fa, ca, 4);
+        // line(screen, fb, cb, 4);
 
         let d_ceil = cb - ca;
         let d_floor = fb - fa;
@@ -87,7 +86,7 @@ impl<'a> State<'a> {
             // TODO: Derive from fundamental geometry
             let u = ((1. - t) * ua / za + t * ub / zb) / ((1. - t) / za + t / zb);
 
-            let u = u.round() as i32 % texture.width() as i32;
+            let u = (u.round() as i32).rem_euclid(texture.width() as i32);
 
             for span in texture.col(u as u32) {
                 // Revisit. Clean up. FIXME: Does not work with different v ranges
@@ -113,7 +112,8 @@ impl<'a> State<'a> {
         pal.clone_from_slice(&self.playpal[0..768]);
 
         let mut screen = ArrayViewMut2::from_shape((200, 320), buf).unwrap();
-        put_sprite(&mut screen, 0, 0, &self.titlepic);
+        // put_sprite(&mut screen, 0, 0, &self.titlepic);
+        fill(&mut screen, 0);
 
         // put_sprite(&mut screen, 160, 150, &self.wall);
 
@@ -122,7 +122,23 @@ impl<'a> State<'a> {
             -20.,
             12.,
             vec2(-16., 100.),
-            vec2(16., 50.),
+            vec2(16., 100.),
+            &self.wall,
+        );
+        self.wall(
+            &mut screen,
+            -20.,
+            12.,
+            vec2(-16., 68.),
+            vec2(-16., 100.),
+            &self.wall,
+        );
+        self.wall(
+            &mut screen,
+            -20.,
+            12.,
+            vec2(16., 100.),
+            vec2(16., 68.),
             &self.wall,
         );
     }

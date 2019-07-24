@@ -1,3 +1,5 @@
+#![feature(euclidean_division)]
+
 extern crate wee_alloc;
 
 use std::{mem, slice};
