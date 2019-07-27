@@ -1,4 +1,5 @@
 use crate::{util::*, Input};
+use array_macro::array;
 use cgmath::prelude::*;
 use cgmath::{vec2, vec3, Vector2, Vector3};
 use ndarray::prelude::*;
@@ -11,7 +12,6 @@ const FOV: f32 = 60. * TAU / 360.;
 const PROJECTION_PLANE_HALF_WIDTH: f32 = PROJECTION_PLANE_WIDTH / 2.;
 
 pub struct State<'a> {
-    distance_to_projection_plane: f32,
     playpal: &'a [u8],
     titlepic: Sprite<'a>,
     wall: Sprite<'a>,
@@ -20,10 +20,51 @@ pub struct State<'a> {
 impl<'a> State<'a> {
     pub fn new(wad: &Wad) -> State {
         State {
-            distance_to_projection_plane: PROJECTION_PLANE_HALF_WIDTH / (FOV / 2.).tan(),
             playpal: wad.by_id(b"PLAYPAL").unwrap(),
             titlepic: Sprite::new(wad.by_id(b"TITLEPIC").unwrap()),
             wall: Sprite::new(wad.by_id(b"WALL62_1").unwrap()),
+        }
+    }
+
+    pub fn render(&self, Input { buf, pal, .. }: Input) {
+        pal.clone_from_slice(&self.playpal[0..768]);
+
+        let mut screen = ArrayViewMut2::from_shape((200, 320), buf).unwrap();
+        // put_sprite(&mut screen, 0, 0, &self.titlepic);
+        fill(&mut screen, 0);
+
+        // put_sprite(&mut screen, 160, 150, &self.wall);
+
+        let mut rendering_state = RenderingState::new(&mut screen);
+
+        let vertices = [
+            vec2(-640., 800.),
+            vec2(-640., 1280.),
+            vec2(640., 1280.),
+            vec2(640., 800.),
+        ];
+
+        let floor = -50.;
+        let ceil = floor + 128.;
+
+        rendering_state.wall(floor, ceil, vertices[0], vertices[1], &self.wall);
+        rendering_state.wall(floor, ceil, vertices[1], vertices[2], &self.wall);
+        rendering_state.wall(floor, ceil, vertices[2], vertices[3], &self.wall);
+    }
+}
+
+struct RenderingState<'a> {
+    distance_to_projection_plane: f32,
+    framebuffer: &'a mut ArrayViewMut2<'a, u8>,
+    open: [std::ops::Range<i32>; 320],
+}
+
+impl<'a> RenderingState<'a> {
+    fn new(framebuffer: &'a mut ArrayViewMut2<'a, u8>) -> RenderingState<'a> {
+        RenderingState {
+            distance_to_projection_plane: PROJECTION_PLANE_HALF_WIDTH / (FOV / 2.).tan(),
+            framebuffer,
+            open: array![0..200; 320],
         }
     }
 
@@ -36,15 +77,7 @@ impl<'a> State<'a> {
         )
     }
 
-    fn wall(
-        &self,
-        screen: &mut ArrayViewMut2<u8>,
-        floor: f32,
-        ceil: f32,
-        a: Vector2<f32>,
-        b: Vector2<f32>,
-        texture: &Sprite,
-    ) {
+    fn wall(&mut self, floor: f32, ceil: f32, a: Vector2<f32>, b: Vector2<f32>, texture: &Sprite) {
         let fa = vec3(a.x, floor, a.y);
         let ca = vec3(a.x, ceil, a.y);
         let fb = vec3(b.x, floor, b.y);
@@ -67,10 +100,10 @@ impl<'a> State<'a> {
         let d_floor = fb - fa;
 
         let ua = 0.;
-        let ub = 128.;
+        let ub = ua + (b - a).magnitude();
 
         let v_top = 0.;
-        let v_bottom = 128.;
+        let v_bottom = ceil - floor;
 
         let x_range = fa.x.round() as i32..fb.x.round() as i32;
         let x_range = intersect(x_range, 0..320);
@@ -88,6 +121,8 @@ impl<'a> State<'a> {
 
             let u = (u.round() as i32).rem_euclid(texture.width() as i32);
 
+            // HITCH! Transparency does not make sense in the first rendering pass!
+            // Solid walls must be treated differently from transparent walls!
             for span in texture.col(u as u32) {
                 // Revisit. Clean up. FIXME: Does not work with different v ranges
                 let span_y_top = top + height * (span.top as f32 / texture.height() as f32);
@@ -98,48 +133,17 @@ impl<'a> State<'a> {
                 let dy = span_y_bottom - span_y_top;
 
                 let y_range = span_y_top.round() as i32..span_y_bottom.round() as i32;
-                let y_range = intersect(y_range, 0..200);
+                let y_range = intersect(y_range, self.open[x as usize].clone());
 
                 for y in y_range {
                     let s = (y as f32 - span_y_top) / dy * span.pixels.len() as f32;
-                    screen[[y as usize, x as usize]] = span.pixels[s as usize];
+                    self.framebuffer[[y as usize, x as usize]] = span.pixels[s as usize];
                 }
             }
+
+            // TODO Yield visplanes
+
+            self.open[x as usize] = 0..0;
         }
-    }
-
-    pub fn render(&self, Input { buf, pal, .. }: Input) {
-        pal.clone_from_slice(&self.playpal[0..768]);
-
-        let mut screen = ArrayViewMut2::from_shape((200, 320), buf).unwrap();
-        // put_sprite(&mut screen, 0, 0, &self.titlepic);
-        fill(&mut screen, 0);
-
-        // put_sprite(&mut screen, 160, 150, &self.wall);
-
-        self.wall(
-            &mut screen,
-            -20.,
-            12.,
-            vec2(-16., 100.),
-            vec2(16., 100.),
-            &self.wall,
-        );
-        self.wall(
-            &mut screen,
-            -20.,
-            12.,
-            vec2(-16., 68.),
-            vec2(-16., 100.),
-            &self.wall,
-        );
-        self.wall(
-            &mut screen,
-            -20.,
-            12.,
-            vec2(16., 100.),
-            vec2(16., 68.),
-            &self.wall,
-        );
     }
 }
