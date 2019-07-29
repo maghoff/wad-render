@@ -13,6 +13,10 @@ pub fn intersect(a: Range<i32>, b: Range<i32>) -> Range<i32> {
     max(a.start, b.start)..min(a.end, b.end)
 }
 
+pub fn is_empty(r: &Range<i32>) -> bool {
+    r.end <= r.start
+}
+
 pub fn put_sprite(trg: &mut ArrayViewMut2<u8>, pos_x: i16, pos_y: i16, sprite: &Sprite) {
     let (height, width) = trg.dim();
 

@@ -3,6 +3,7 @@ use array_macro::array;
 use cgmath::prelude::*;
 use cgmath::{vec2, vec3, Vector2, Vector3};
 use ndarray::prelude::*;
+use std::ops::Range;
 use wad::Wad;
 use wad_gfx::Sprite;
 
@@ -49,14 +50,17 @@ impl<'a> State<'a> {
 
         rendering_state.wall(floor, ceil, vertices[0], vertices[1], &self.wall);
         rendering_state.wall(floor, ceil, vertices[1], vertices[2], &self.wall);
+        assert_eq!(rendering_state.is_complete(), false);
         rendering_state.wall(floor, ceil, vertices[2], vertices[3], &self.wall);
+        assert_eq!(rendering_state.is_complete(), true);
     }
 }
 
 struct RenderingState<'a> {
     distance_to_projection_plane: f32,
     framebuffer: &'a mut ArrayViewMut2<'a, u8>,
-    open: [std::ops::Range<i32>; 320],
+    h_open: Vec<Range<i32>>,
+    v_open: [Range<i32>; 320],
 }
 
 impl<'a> RenderingState<'a> {
@@ -64,7 +68,8 @@ impl<'a> RenderingState<'a> {
         RenderingState {
             distance_to_projection_plane: PROJECTION_PLANE_HALF_WIDTH / (FOV / 2.).tan(),
             framebuffer,
-            open: array![0..200; 320],
+            h_open: vec![0..320],
+            v_open: array![0..200; 320],
         }
     }
 
@@ -75,6 +80,35 @@ impl<'a> RenderingState<'a> {
             160. + self.distance_to_projection_plane * p.x * w,
             100. - self.distance_to_projection_plane * p.y * w,
         )
+    }
+
+    fn is_complete(&self) -> bool {
+        self.h_open.is_empty()
+    }
+
+    fn apply_horizontal_clipping(&mut self, r: Range<i32>) -> Vec<Range<i32>> {
+        let mut to_render = vec![];
+        let mut clipped = vec![];
+
+        for c in self.h_open.drain(..).into_iter() {
+            let i = intersect(c.clone(), r.clone());
+
+            if is_empty(&i) {
+                clipped.push(c);
+            } else {
+                if c.start < i.start {
+                    clipped.push(c.start..i.start);
+                }
+                if i.end < c.end {
+                    clipped.push(i.end..c.end);
+                }
+
+                to_render.push(i);
+            }
+        }
+
+        self.h_open = clipped;
+        to_render
     }
 
     fn wall(&mut self, floor: f32, ceil: f32, a: Vector2<f32>, b: Vector2<f32>, texture: &Sprite) {
@@ -91,11 +125,6 @@ impl<'a> RenderingState<'a> {
         let fb = self.project(fb);
         let cb = self.project(cb);
 
-        // line(screen, fa, fb, 4);
-        // line(screen, ca, cb, 4);
-        // line(screen, fa, ca, 4);
-        // line(screen, fb, cb, 4);
-
         let d_ceil = cb - ca;
         let d_floor = fb - fa;
 
@@ -106,9 +135,10 @@ impl<'a> RenderingState<'a> {
         let v_bottom = ceil - floor;
 
         let x_range = fa.x.round() as i32..fb.x.round() as i32;
-        let x_range = intersect(x_range, 0..320);
+        // let x_ranges = vec![intersect(x_range, 0..320)];
+        let x_ranges = self.apply_horizontal_clipping(x_range);
 
-        for x in x_range {
+        for x in x_ranges.into_iter().flatten() {
             let t = (x as f32 - fa.x) / d_floor.x;
 
             let top = ca.y + d_ceil.y * t;
@@ -133,7 +163,10 @@ impl<'a> RenderingState<'a> {
                 let dy = span_y_bottom - span_y_top;
 
                 let y_range = span_y_top.round() as i32..span_y_bottom.round() as i32;
-                let y_range = intersect(y_range, self.open[x as usize].clone());
+
+                // Vertical clipping
+                // let y_range = intersect(y_range, 0..200); // Redundant
+                let y_range = intersect(y_range, self.v_open[x as usize].clone());
 
                 for y in y_range {
                     let s = (y as f32 - span_y_top) / dy * span.pixels.len() as f32;
@@ -143,7 +176,8 @@ impl<'a> RenderingState<'a> {
 
             // TODO Yield visplanes
 
-            self.open[x as usize] = 0..0;
+            // Vertical clipping. Walls (not portals) always cover the full height.
+            self.v_open[x as usize] = 0..0;
         }
     }
 }
