@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use cgmath::prelude::*;
 use cgmath::Vector2;
 use ndarray::prelude::*;
@@ -64,5 +66,64 @@ pub fn line(trg: &mut ArrayViewMut2<u8>, a: Vector2<f32>, b: Vector2<f32>, col: 
 pub fn fill(trg: &mut ArrayViewMut2<u8>, col: u8) {
     for x in trg.iter_mut() {
         *x = col;
+    }
+}
+
+use std::collections::HashMap;
+
+pub struct TextureProvider<'a> {
+    wad: wad::WadSlice<'a>,
+    patch_provider: wad_gfx::EagerPatchProvider<'a>,
+    texture_dir: wad_gfx::TextureDirectory<'a>,
+    cache: HashMap<wad::EntryId, Vec<u8>>,
+}
+
+impl<'a> TextureProvider<'a> {
+    pub fn new(wad: wad::WadSlice) -> TextureProvider {
+        let pnames = wad.by_id(b"PNAMES").unwrap().iter().map(|x| x.to_ascii_uppercase()).collect::<Vec<_>>();
+        let pnames = wad_gfx::parse_pnames(&pnames);
+        let texture_dir = wad.by_id(b"TEXTURE1").unwrap();
+
+        TextureProvider {
+            wad: wad.slice(..),
+            patch_provider: wad_gfx::EagerPatchProvider::new(wad, pnames),
+            texture_dir: wad_gfx::TextureDirectory::new(texture_dir),
+            cache: HashMap::new(),
+        }
+    }
+
+    fn find_texture(&self, id: wad::EntryId) -> Option<wad_gfx::Texture<'a>> {
+        for i in 0..self.texture_dir.len() {
+            let t = self.texture_dir.texture(i);
+            if wad::EntryId::from_bytes(&t.name()) == id {
+                return Some(t);
+            }
+        }
+
+        None
+    }
+
+    pub fn texture(&mut self, id: impl Into<wad::EntryId>) -> Sprite {
+        let id = id.into();
+        let texture = self.find_texture(id).unwrap();
+        let patch_provider = &self.patch_provider;
+
+        let data = self
+            .cache
+            .entry(id)
+            .or_insert_with(|| wad_gfx::render_texture(texture, patch_provider));
+
+        Sprite::new(data)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn texture_provider() {
+        let wad = wad::parse_wad(Vec::from(include_bytes!("../doom1.wad") as &[u8])).unwrap();
+        let _ = TextureProvider::new(wad.as_slice());
     }
 }

@@ -9,8 +9,11 @@ crate-type = ["cdylib"]
 
 [dependencies]
 wee_alloc = "0.4.4"
-wad = "0.3.2"
+wad = { git = "https://github.com/maghoff/wad.git" }
 wad-gfx = { git = "https://github.com/maghoff/wad-gfx.git" }
 ndarray = "0.12.1"
 cgmath = "0.17.0"
 array-macro = "1.0.4"
+
+[patch.crates-io]
+wad = { git = "https://github.com/maghoff/wad.git" }

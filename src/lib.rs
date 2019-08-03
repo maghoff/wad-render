@@ -44,7 +44,7 @@ pub fn init<'a>(wad: *mut wad::Wad) -> *mut renderer::State<'a> {
 
 #[no_mangle]
 pub fn render(state: *mut renderer::State, screen_ptr: *mut u8) {
-    let state = unsafe { Box::from_raw(state) };
+    let mut state = unsafe { Box::from_raw(state) };
 
     let screen_slice: &mut [u8] = unsafe {
         slice::from_raw_parts_mut(mem::transmute(screen_ptr), SCREEN_WIDTH * SCREEN_HEIGHT * 4)

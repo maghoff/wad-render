@@ -16,6 +16,7 @@ pub struct State<'a> {
     playpal: &'a [u8],
     titlepic: Sprite<'a>,
     wall: Sprite<'a>,
+    texture_provider: TextureProvider<'a>,
 }
 
 impl<'a> State<'a> {
@@ -24,10 +25,11 @@ impl<'a> State<'a> {
             playpal: wad.by_id(b"PLAYPAL").unwrap(),
             titlepic: Sprite::new(wad.by_id(b"TITLEPIC").unwrap()),
             wall: Sprite::new(wad.by_id(b"WALL62_1").unwrap()),
+            texture_provider: TextureProvider::new(wad.as_slice()),
         }
     }
 
-    pub fn render(&self, Input { buf, pal, .. }: Input) {
+    pub fn render(&mut self, Input { buf, pal, .. }: Input) {
         pal.clone_from_slice(&self.playpal[0..768]);
 
         let mut screen = ArrayViewMut2::from_shape((200, 320), buf).unwrap();
@@ -48,10 +50,13 @@ impl<'a> State<'a> {
         let floor = -50.;
         let ceil = floor + 128.;
 
-        rendering_state.wall(floor, ceil, vertices[0], vertices[1], &self.wall);
-        rendering_state.wall(floor, ceil, vertices[1], vertices[2], &self.wall);
+        let texture = &self.texture_provider.texture(b"BROWN1");
+        // let texture = &self.wall;
+
+        rendering_state.wall(floor, ceil, vertices[0], vertices[1], texture);
+        rendering_state.wall(floor, ceil, vertices[1], vertices[2], texture);
         assert_eq!(rendering_state.is_complete(), false);
-        rendering_state.wall(floor, ceil, vertices[2], vertices[3], &self.wall);
+        rendering_state.wall(floor, ceil, vertices[2], vertices[3], texture);
         assert_eq!(rendering_state.is_complete(), true);
     }
 }
