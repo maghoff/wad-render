@@ -29,7 +29,12 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn render(&mut self, Input { buf, pal, .. }: Input) {
+    pub fn render(
+        &mut self,
+        Input {
+            buf, pal, pos, dir, ..
+        }: Input,
+    ) {
         pal.clone_from_slice(&self.playpal[0..768]);
 
         let mut screen = ArrayViewMut2::from_shape((200, 320), buf).unwrap();
@@ -47,17 +52,20 @@ impl<'a> State<'a> {
             vec2(640., 800.),
         ];
 
+        let transform = cgmath::Matrix2::new(dir.x, dir.y, -dir.y, dir.x);
+        let vertices = vertices
+            .into_iter()
+            .map(|&v| transform * (v - pos))
+            .collect::<Vec<_>>();
+
         let floor = -50.;
         let ceil = floor + 128.;
 
         let texture = &self.texture_provider.texture(b"BROWN1");
-        // let texture = &self.wall;
 
         rendering_state.wall(floor, ceil, vertices[0], vertices[1], texture);
         rendering_state.wall(floor, ceil, vertices[1], vertices[2], texture);
-        assert_eq!(rendering_state.is_complete(), false);
         rendering_state.wall(floor, ceil, vertices[2], vertices[3], texture);
-        assert_eq!(rendering_state.is_complete(), true);
     }
 }
 

@@ -2,6 +2,7 @@
 
 extern crate wee_alloc;
 
+use cgmath::{vec2, Vector2};
 use std::{mem, slice};
 
 mod renderer;
@@ -13,6 +14,8 @@ const SCREEN_HEIGHT: usize = 200;
 pub struct Input<'a> {
     pal: &'a mut [u8; 768],
     buf: &'a mut [u8; 320 * 200],
+    pos: Vector2<f32>,
+    dir: Vector2<f32>,
 }
 
 #[global_allocator]
@@ -43,7 +46,14 @@ pub fn init<'a>(wad: *mut wad::Wad) -> *mut renderer::State<'a> {
 }
 
 #[no_mangle]
-pub fn render(state: *mut renderer::State, screen_ptr: *mut u8) {
+pub fn render(
+    state: *mut renderer::State,
+    screen_ptr: *mut u8,
+    cx: f32,
+    cy: f32,
+    dx: f32,
+    dy: f32,
+) {
     let mut state = unsafe { Box::from_raw(state) };
 
     let screen_slice: &mut [u8] = unsafe {
@@ -52,14 +62,19 @@ pub fn render(state: *mut renderer::State, screen_ptr: *mut u8) {
 
     let mut pal = [0; 768];
     for i in 0..256 {
-        pal[i*3+0] = i as u8;
-        pal[i*3+1] = 0;
-        pal[i*3+2] = 0;
+        pal[i * 3 + 0] = i as u8;
+        pal[i * 3 + 1] = 0;
+        pal[i * 3 + 2] = 0;
     }
 
     let mut framebuf = [0; SCREEN_WIDTH * SCREEN_HEIGHT];
 
-    let input = Input { pal: &mut pal, buf: &mut framebuf };
+    let input = Input {
+        pal: &mut pal,
+        buf: &mut framebuf,
+        pos: vec2(-cx, cy), // FIXME Why this coordinate transformation?
+        dir: vec2(dy, -dx), // FIXME Why this coordinate transformation?
+    };
 
     state.render(input);
 
