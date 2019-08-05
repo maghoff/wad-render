@@ -88,3 +88,13 @@ pub fn render(
 
     Box::leak(state);
 }
+
+#[no_mangle]
+pub fn svg_from_map(state: *mut renderer::State) -> *const [u8] {
+    let state = unsafe { Box::from_raw(state) };
+
+    // let svg = state.svg_from_map().into_bytes().into_boxed_slice();
+    let svg = String::from("LOL").into_bytes().into_boxed_slice();
+
+    Box::leak(svg) as _
+}

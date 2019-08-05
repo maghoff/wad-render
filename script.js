@@ -158,6 +158,11 @@ async function init() {
 
     // --- --- ---
 
+    const svg = mod.svg_from_map(state);
+    console.log(svg);
+
+    // --- --- ---
+
     let focusPoint = { x: 0, y: 0 };
     let direction = { x: 0, y: 1 };
 

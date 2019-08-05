@@ -17,6 +17,7 @@ pub struct State<'a> {
     titlepic: Sprite<'a>,
     wall: Sprite<'a>,
     texture_provider: TextureProvider<'a>,
+    map: wad_map::Map,
 }
 
 impl<'a> State<'a> {
@@ -26,7 +27,14 @@ impl<'a> State<'a> {
             titlepic: Sprite::new(wad.by_id(b"TITLEPIC").unwrap()),
             wall: Sprite::new(wad.by_id(b"WALL62_1").unwrap()),
             texture_provider: TextureProvider::new(wad.as_slice()),
+            map: wad_map::read_map(&wad.as_slice(), "E1M1").unwrap(),
         }
+    }
+
+    pub fn svg_from_map(&self) -> String {
+        let mut buf = String::new();
+        generate_svg(&mut buf, &self.map.vertexes, &self.map.linedefs).unwrap();
+        buf
     }
 
     pub fn render(

@@ -4,8 +4,10 @@ use cgmath::prelude::*;
 use cgmath::Vector2;
 use ndarray::prelude::*;
 use std::cmp::{max, min};
+use std::io::Write;
 use std::ops::Range;
 use wad_gfx::Sprite;
+use wad_map::*;
 
 pub fn add(r: Range<i32>, d: i32) -> Range<i32> {
     (r.start + d)..(r.end + d)
@@ -80,7 +82,12 @@ pub struct TextureProvider<'a> {
 
 impl<'a> TextureProvider<'a> {
     pub fn new(wad: wad::WadSlice) -> TextureProvider {
-        let pnames = wad.by_id(b"PNAMES").unwrap().iter().map(|x| x.to_ascii_uppercase()).collect::<Vec<_>>();
+        let pnames = wad
+            .by_id(b"PNAMES")
+            .unwrap()
+            .iter()
+            .map(|x| x.to_ascii_uppercase())
+            .collect::<Vec<_>>();
         let pnames = wad_gfx::parse_pnames(&pnames);
         let texture_dir = wad.by_id(b"TEXTURE1").unwrap();
 
@@ -115,6 +122,57 @@ impl<'a> TextureProvider<'a> {
 
         Sprite::new(data)
     }
+}
+
+pub fn generate_svg(
+    mut out: impl std::fmt::Write,
+    vertexes: &[Vertex],
+    linedefs: &[Linedef],
+) -> std::fmt::Result {
+    let mut bbox = BoundingBox::from(vertexes);
+    bbox.grow(20);
+
+    writeln!(
+        out,
+        r#"<svg viewBox="{} {} {} {}" xmlns="http://www.w3.org/2000/svg">"#,
+        bbox.left(),
+        -bbox.bottom(),
+        bbox.width(),
+        bbox.height()
+    )?;
+
+    writeln!(
+        out,
+        "{}",
+        r#"<style>
+line {
+    stroke: black;
+    stroke-width: 2px;
+}
+
+.portal {
+    stroke: #888;
+}
+</style>"#
+    )?;
+
+    for linedef in linedefs {
+        let a = &vertexes[linedef.a as usize];
+        let b = &vertexes[linedef.b as usize];
+
+        let portal = linedef.left_sidedef.is_some() && linedef.right_sidedef.is_some();
+
+        let class = if portal { r#" class="portal""# } else { "" };
+
+        writeln!(
+            out,
+            r#"<line x1="{}" y1="{}" x2="{}" y2="{}"{} />"#,
+            a.x, -a.y, b.x, -b.y, class
+        )?;
+    }
+    writeln!(out, r#"</svg>"#)?;
+
+    Ok(())
 }
 
 #[cfg(test)]
