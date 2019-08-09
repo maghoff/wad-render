@@ -159,7 +159,11 @@ async function init() {
     // --- --- ---
 
     const svg = mod.svg_from_map(state);
-    console.log(svg);
+    let dec = new TextDecoder();
+    let svgbuf = new Uint8Array(mod.memory.buffer, mod.str_buf(svg), mod.str_len(svg));
+    let svgtext = dec.decode(svgbuf);
+    document.getElementById("map").innerHTML = svgtext;
+    mod.str_del(svg);
 
     // --- --- ---
 

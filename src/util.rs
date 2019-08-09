@@ -184,4 +184,12 @@ mod test {
         let wad = wad::parse_wad(Vec::from(include_bytes!("../doom1.wad") as &[u8])).unwrap();
         let _ = TextureProvider::new(wad.as_slice());
     }
+
+    #[test]
+    fn svg() {
+        let wad = wad::parse_wad(Vec::from(include_bytes!("../doom1.wad") as &[u8])).unwrap();
+        let map = wad_map::read_map(&wad.as_slice(), "E1M1").unwrap();
+        let mut buf = String::new();
+        let _ = generate_svg(&mut buf, &map.vertexes, &map.linedefs);
+    }
 }

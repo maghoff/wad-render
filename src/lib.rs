@@ -88,11 +88,23 @@ pub fn render(
 }
 
 #[no_mangle]
-pub fn svg_from_map(state: *mut renderer::State) -> *const [u8] {
-    let state = unsafe { Box::from_raw(state) };
+pub unsafe fn str_buf(s: *mut String) -> *const u8 {
+    let buf = (*s).as_bytes();
+    &buf[0] as _
+}
 
-    // let svg = state.svg_from_map().into_bytes().into_boxed_slice();
-    let svg = String::from("LOL").into_bytes().into_boxed_slice();
+#[no_mangle]
+pub unsafe fn str_len(s: *mut String) -> usize {
+    (*s).as_bytes().len()
+}
 
+#[no_mangle]
+pub unsafe fn str_del(s: *mut String) {
+    Box::from_raw(s);
+}
+
+#[no_mangle]
+pub fn svg_from_map(state: *mut renderer::State) -> *const String {
+    let svg = Box::new(unsafe { (*state).svg_from_map() });
     Box::leak(svg) as _
 }

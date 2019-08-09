@@ -16,3 +16,17 @@ body {
     width: 640px;
     height: 480px;
 }
+
+canvas {
+    vertical-align: top;
+}
+
+#map {
+    width: 100%;
+    height: 600px;
+}
+
+#map>svg {
+    width: 100%;
+    height: 100%;
+}
