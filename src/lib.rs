@@ -1,5 +1,3 @@
-#![feature(euclidean_division)]
-
 extern crate wee_alloc;
 
 use cgmath::{vec2, Vector2};
