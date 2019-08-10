@@ -167,8 +167,9 @@ async function init() {
 
     // --- --- ---
 
-    let focusPoint = { x: 0, y: 0 };
-    let direction = { x: 0, y: 1 };
+    let focusPoint = { x: mod.spawn_point_x(state), y: mod.spawn_point_y(state) };
+    let direction = { x: mod.spawn_point_dx(state), y: mod.spawn_point_dy(state) };
+    console.log(focusPoint, direction);
 
     let pendingRender = false;
     function render(_timestamp) {

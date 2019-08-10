@@ -108,3 +108,23 @@ pub fn svg_from_map(state: *mut renderer::State) -> *const String {
     let svg = Box::new(unsafe { (*state).svg_from_map() });
     Box::leak(svg) as _
 }
+
+#[no_mangle]
+pub fn spawn_point_x(state: *mut renderer::State) -> f32 {
+    unsafe { (*state).spawn_point().0.x }
+}
+
+#[no_mangle]
+pub fn spawn_point_y(state: *mut renderer::State) -> f32 {
+    unsafe { (*state).spawn_point().0.y }
+}
+
+#[no_mangle]
+pub fn spawn_point_dx(state: *mut renderer::State) -> f32 {
+    unsafe { (*state).spawn_point().1.x }
+}
+
+#[no_mangle]
+pub fn spawn_point_dy(state: *mut renderer::State) -> f32 {
+    unsafe { (*state).spawn_point().1.y }
+}

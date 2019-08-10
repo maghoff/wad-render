@@ -14,8 +14,6 @@ const PROJECTION_PLANE_HALF_WIDTH: f32 = PROJECTION_PLANE_WIDTH / 2.;
 
 pub struct State<'a> {
     playpal: &'a [u8],
-    titlepic: Sprite<'a>,
-    wall: Sprite<'a>,
     texture_provider: TextureProvider<'a>,
     map: wad_map::Map,
 }
@@ -24,8 +22,6 @@ impl<'a> State<'a> {
     pub fn new(wad: &Wad) -> State {
         State {
             playpal: wad.by_id(b"PLAYPAL").unwrap(),
-            titlepic: Sprite::new(wad.by_id(b"TITLEPIC").unwrap()),
-            wall: Sprite::new(wad.by_id(b"WALL62_1").unwrap()),
             texture_provider: TextureProvider::new(wad.as_slice()),
             map: wad_map::read_map(&wad.as_slice(), "E1M1").unwrap(),
         }
@@ -35,6 +31,15 @@ impl<'a> State<'a> {
         let mut buf = String::new();
         generate_svg(&mut buf, &self.map.vertexes, &self.map.linedefs).unwrap();
         buf
+    }
+
+    pub fn spawn_point(&self) -> (Vector2<f32>, Vector2<f32>) {
+        let spawn_thing = &self.map.things.iter().find(|&x| x.thing_type == 1).unwrap();
+        let ang = spawn_thing.ang as f32 / std::u16::MAX as f32 * TAU;
+        (
+            vec2(spawn_thing.x as _, spawn_thing.y as _),
+            vec2(ang.cos(), ang.sin()),
+        )
     }
 
     pub fn render(
