@@ -142,6 +142,11 @@ impl<'a> RenderingState<'a> {
     }
 
     fn wall(&mut self, floor: f32, ceil: f32, a: Vector2<f32>, b: Vector2<f32>, texture: &Sprite) {
+        let front_face = -a.perp_dot(b - a) > 0.;
+        if !front_face {
+            return;
+        }
+
         let fa = vec3(a.x, floor, a.y);
         let ca = vec3(a.x, ceil, a.y);
         let fb = vec3(b.x, floor, b.y);
