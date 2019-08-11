@@ -167,18 +167,10 @@ async function init() {
 
     const state = mod.init(wadObject);
 
-    // --- --- ---
-
-    renderMap(mod, state);
-    let mapRoot = document.getElementById("map-root");
-
-    // --- --- ---
-
     let focusPoint = { x: mod.spawn_point_x(state), y: mod.spawn_point_y(state) };
     let direction = { x: mod.spawn_point_dx(state), y: mod.spawn_point_dy(state) };
-    console.log(focusPoint, direction);
 
-    let mapApi = interactiveMap(mapRoot, { focusPoint, direction }, updateCamera);
+    // --- --- ---
 
     let pendingRender = false;
     function render(_timestamp) {
@@ -199,6 +191,14 @@ async function init() {
         direction.y = newDirection.y;
         scheduleRender();
     }
+
+    // --- --- ---
+
+    renderMap(mod, state);
+    let mapRoot = document.getElementById("map-root");
+    let mapApi = interactiveMap(mapRoot, { focusPoint, direction }, updateCamera);
+
+    // --- --- ---
 
     fpsControls(
         document.getElementById('screen'),
