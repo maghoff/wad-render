@@ -124,17 +124,13 @@ impl<'a> TextureProvider<'a> {
     }
 }
 
-pub fn generate_svg(
-    mut out: impl std::fmt::Write,
-    vertexes: &[Vertex],
-    linedefs: &[Linedef],
-) -> std::fmt::Result {
-    let mut bbox = BoundingBox::from(vertexes);
+pub fn generate_svg(mut out: impl std::fmt::Write, map: &wad_map::Map) -> std::fmt::Result {
+    let mut bbox = BoundingBox::from(&map.vertexes);
     bbox.grow(20);
 
     writeln!(
         out,
-        r#"<svg viewBox="{} {} {} {}" xmlns="http://www.w3.org/2000/svg">"#,
+        r#"<svg viewBox="{} {} {} {}" xmlns="http://www.w3.org/2000/svg"><g id="map-root" transform="scale(1, -1)">"#,
         bbox.left(),
         -bbox.bottom(),
         bbox.width(),
@@ -143,22 +139,20 @@ pub fn generate_svg(
 
     writeln!(
         out,
-        "{}",
-        r#"<style>
-line {
-    stroke: black;
-    stroke-width: 2px;
-}
-
-.portal {
-    stroke: #888;
-}
-</style>"#
+        r##"
+    <marker id="arrowhead"
+        markerWidth="10" markerHeight="10"
+        refX="5" refY="5"
+        orient="auto"
+        markerUnits="strokeWidth"
+    >
+        <path d="M3,3 l3,2 l-3,2" fill="none" stroke="#41f4a9" stroke-linecap="round"/>
+    </marker>"##,
     )?;
 
-    for linedef in linedefs {
-        let a = &vertexes[linedef.a as usize];
-        let b = &vertexes[linedef.b as usize];
+    for linedef in &map.linedefs {
+        let a = &map.vertexes[linedef.a as usize];
+        let b = &map.vertexes[linedef.b as usize];
 
         let portal = linedef.left_sidedef.is_some() && linedef.right_sidedef.is_some();
 
@@ -167,10 +161,23 @@ line {
         writeln!(
             out,
             r#"<line x1="{}" y1="{}" x2="{}" y2="{}"{} />"#,
-            a.x, -a.y, b.x, -b.y, class
+            a.x, a.y, b.x, b.y, class
         )?;
     }
-    writeln!(out, r#"</svg>"#)?;
+    writeln!(
+        out,
+        r#"
+    <g class="camera">
+        <line class="camera--sightline" />
+        <line class="camera--direction" marker-end="url(#arrowhead)" />
+        <line class="camera--fov-left" />
+        <line class="camera--fov-right" />
+        <circle r="32" class="camera--focus" />
+        <circle r="32" class="camera--target" />
+    </g>
+    </g></svg>
+    "#
+    )?;
 
     Ok(())
 }
@@ -190,6 +197,6 @@ mod test {
         let wad = wad::parse_wad(Vec::from(include_bytes!("../doom1.wad") as &[u8])).unwrap();
         let map = wad_map::read_map(&wad.as_slice(), "E1M1").unwrap();
         let mut buf = String::new();
-        let _ = generate_svg(&mut buf, &map.vertexes, &map.linedefs);
+        let _ = generate_svg(&mut buf, &map);
     }
 }

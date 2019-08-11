@@ -70,8 +70,8 @@ pub fn render(
     let input = Input {
         pal: &mut pal,
         buf: &mut framebuf,
-        pos: vec2(-cx, cy), // FIXME Why this coordinate transformation?
-        dir: vec2(dy, -dx), // FIXME Why this coordinate transformation?
+        pos: vec2(cx, cy),
+        dir: vec2(dx, dy),
     };
 
     state.render(input);

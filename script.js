@@ -1,5 +1,7 @@
 "use strict";
 
+import interactiveMap from './interactive-map.js';
+
 const WIDTH = 320;
 const HEIGHT = 200;
 const FRAME_BYTE_SIZE = WIDTH * HEIGHT * 4;
@@ -16,7 +18,7 @@ function fpsControls(dom, pos, dir, update) {
         ev.stopPropagation();
 
         const d = dir();
-        const ang = ev.movementX / 90;
+        const ang = -ev.movementX / 90;
 
         update(
             pos(),
@@ -56,7 +58,7 @@ function fpsControls(dom, pos, dir, update) {
 
         const p = pos();
         const d = dir();
-        const s = { x: -d.y, y: d.x };
+        const s = { x: d.y, y: -d.x };
         update(
             {
                 x: p.x + fwd * l * d.x + rig * l * s.x,
@@ -137,6 +139,15 @@ function renderFrame(mod, state, screen, focusPoint, direction) {
     screen.ctx.putImageData(img, 0, 0);
 }
 
+function renderMap(mod, state) {
+    const svg = mod.svg_from_map(state);
+    let dec = new TextDecoder();
+    let svgbuf = new Uint8Array(mod.memory.buffer, mod.str_buf(svg), mod.str_len(svg));
+    let svgtext = dec.decode(svgbuf);
+    document.getElementById("map-container").innerHTML = svgtext;
+    mod.str_del(svg);
+}
+
 async function init() {
     const [wasm, wad] = await Promise.all([
         WebAssembly.instantiateStreaming(fetch("wad_render.gc.wasm")),
@@ -158,18 +169,16 @@ async function init() {
 
     // --- --- ---
 
-    const svg = mod.svg_from_map(state);
-    let dec = new TextDecoder();
-    let svgbuf = new Uint8Array(mod.memory.buffer, mod.str_buf(svg), mod.str_len(svg));
-    let svgtext = dec.decode(svgbuf);
-    document.getElementById("map").innerHTML = svgtext;
-    mod.str_del(svg);
+    renderMap(mod, state);
+    let mapRoot = document.getElementById("map-root");
 
     // --- --- ---
 
     let focusPoint = { x: mod.spawn_point_x(state), y: mod.spawn_point_y(state) };
     let direction = { x: mod.spawn_point_dx(state), y: mod.spawn_point_dy(state) };
     console.log(focusPoint, direction);
+
+    let mapApi = interactiveMap(mapRoot, { focusPoint, direction }, updateCamera);
 
     let pendingRender = false;
     function render(_timestamp) {
@@ -196,8 +205,9 @@ async function init() {
         () => focusPoint,
         () => direction,
         (focusPoint, direction) => {
+            mapApi.updateCamera(focusPoint, direction);
             updateCamera(focusPoint, direction);
-        }
+        },
     );
 
     // --- --- ---

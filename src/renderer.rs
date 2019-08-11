@@ -29,13 +29,13 @@ impl<'a> State<'a> {
 
     pub fn svg_from_map(&self) -> String {
         let mut buf = String::new();
-        generate_svg(&mut buf, &self.map.vertexes, &self.map.linedefs).unwrap();
+        generate_svg(&mut buf, &self.map).unwrap();
         buf
     }
 
     pub fn spawn_point(&self) -> (Vector2<f32>, Vector2<f32>) {
         let spawn_thing = &self.map.things.iter().find(|&x| x.thing_type == 1).unwrap();
-        let ang = spawn_thing.ang as f32 / std::u16::MAX as f32 * TAU;
+        let ang = spawn_thing.ang as f32 / 360. * TAU;
         (
             vec2(spawn_thing.x as _, spawn_thing.y as _),
             vec2(ang.cos(), ang.sin()),
@@ -59,13 +59,17 @@ impl<'a> State<'a> {
         let mut rendering_state = RenderingState::new(&mut screen);
 
         let vertices = [
-            vec2(-640., 800.),
-            vec2(-640., 1280.),
-            vec2(640., 1280.),
-            vec2(640., 800.),
+            // vec2(-640., 800.),
+            // vec2(-640., 1280.),
+            // vec2(640., 1280.),
+            // vec2(640., 800.),
+            vec2(968., -2880.),
+            vec2(1216., -2880.),
         ];
 
-        let transform = cgmath::Matrix2::new(dir.x, dir.y, -dir.y, dir.x);
+        // Mysterious rotation matrix:
+        let transform = cgmath::Matrix2::new(dir.y, dir.x, -dir.x, dir.y);
+
         let vertices = vertices
             .into_iter()
             .map(|&v| transform * (v - pos))
@@ -77,8 +81,8 @@ impl<'a> State<'a> {
         let texture = &self.texture_provider.texture(b"BROWN1");
 
         rendering_state.wall(floor, ceil, vertices[0], vertices[1], texture);
-        rendering_state.wall(floor, ceil, vertices[1], vertices[2], texture);
-        rendering_state.wall(floor, ceil, vertices[2], vertices[3], texture);
+        // rendering_state.wall(floor, ceil, vertices[1], vertices[2], texture);
+        // rendering_state.wall(floor, ceil, vertices[2], vertices[3], texture);
     }
 }
 
