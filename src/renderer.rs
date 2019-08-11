@@ -250,8 +250,8 @@ impl<'a> RenderingState<'a> {
         let v_bottom = ceil - floor;
 
         let x_range = fa.x.round() as i32..fb.x.round() as i32;
-        // let x_ranges = vec![intersect(x_range, 0..320)];
-        let x_ranges = self.apply_horizontal_clipping(x_range);
+        let x_ranges = vec![intersect(x_range, 0..320)];
+        // let x_ranges = self.apply_horizontal_clipping(x_range);
 
         for x in x_ranges.into_iter().flatten() {
             let t = (x as f32 - fa.x) / d_floor.x;
@@ -259,6 +259,9 @@ impl<'a> RenderingState<'a> {
             let top = ca.y + d_ceil.y * t;
             let bottom = fa.y + d_floor.y * t;
             let height = bottom - top;
+            if height < 0. {
+                continue;
+            }
 
             // Perspective correct interpolation of u coordinate
             // TODO: Derive from fundamental geometry
