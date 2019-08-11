@@ -18,6 +18,56 @@ pub struct State<'a> {
     map: wad_map::Map,
 }
 
+pub struct BspTraverser<'a> {
+    nodes: &'a [wad_map::Node],
+    subsectors: &'a [wad_map::Subsector],
+    pos: Vector2<f32>,
+    state: Vec<wad_map::Child>,
+}
+
+impl<'a> BspTraverser<'a> {
+    fn new(
+        nodes: &'a [wad_map::Node],
+        subsectors: &'a [wad_map::Subsector],
+        pos: Vector2<f32>,
+    ) -> BspTraverser<'a> {
+        BspTraverser {
+            nodes,
+            subsectors,
+            pos,
+            state: vec![((nodes.len() - 1) as u16).into()],
+        }
+    }
+}
+
+impl<'a> Iterator for BspTraverser<'a> {
+    type Item = &'a wad_map::Subsector;
+
+    fn next(&mut self) -> Option<&'a wad_map::Subsector> {
+        match self.state.pop()? {
+            wad_map::Child::Subsector(s) => Some(&self.subsectors[s as usize]),
+            wad_map::Child::Subnode(n) => {
+                let node = &self.nodes[n as usize];
+
+                let view = self.pos - vec2(node.x as f32, node.y as f32);
+                let left = node.dy as f32 * view.x; // How does this work with Doom's fixed point arithmetics?
+                let right = view.y * node.dx as f32;
+
+                let is_right_side = right < left;
+
+                if is_right_side {
+                    self.state.push(node.left_child.clone());
+                    self.state.push(node.right_child.clone());
+                } else {
+                    self.state.push(node.right_child.clone());
+                    self.state.push(node.left_child.clone());
+                }
+                self.next()
+            }
+        }
+    }
+}
+
 impl<'a> State<'a> {
     pub fn new(wad: &Wad) -> State {
         State {
@@ -78,11 +128,41 @@ impl<'a> State<'a> {
         let floor = -50.;
         let ceil = floor + 128.;
 
-        let texture = &self.texture_provider.texture(b"BROWN1");
+        // let texture = &self.texture_provider.texture(b"BROWN1");
 
-        rendering_state.wall(floor, ceil, vertices[0], vertices[1], texture);
+        // rendering_state.wall(floor, ceil, vertices[0], vertices[1], texture);
         // rendering_state.wall(floor, ceil, vertices[1], vertices[2], texture);
         // rendering_state.wall(floor, ceil, vertices[2], vertices[3], texture);
+
+        for subsector in BspTraverser::new(&self.map.nodes, &self.map.subsectors, pos) {
+            let start = subsector.first_seg as usize;
+            let end = start + subsector.seg_count as usize;
+            for line_segment in &self.map.line_segments[start..end] {
+                let linedef = &self.map.linedefs[line_segment.linedef as usize];
+                let portal = linedef.right_sidedef.is_some() && linedef.left_sidedef.is_some();
+                if portal {
+                    continue;
+                }
+
+                let texture = linedef
+                    .right_sidedef
+                    .map(|x| &self.map.sidedefs[x as usize].middle_texture)
+                    .unwrap_or(b"BROWN1\0\0")
+                    .clone();
+                let texture = &self.texture_provider.texture(&texture);
+
+                let a = &self.map.vertexes[line_segment.start_vertex as usize];
+                let b = &self.map.vertexes[line_segment.end_vertex as usize];
+
+                let a = vec2(a.x as _, a.y as _);
+                let b = vec2(b.x as _, b.y as _);
+
+                let a = transform * (a - pos);
+                let b = transform * (b - pos);
+
+                rendering_state.wall(floor, ceil, a, b, texture);
+            }
+        }
     }
 }
 

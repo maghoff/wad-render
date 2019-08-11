@@ -452,7 +452,7 @@ dependencies = [
 [[package]]
 name = "wad-map"
 version = "0.1.0"
-source = "git+https://github.com/maghoff/wad-map.git#815a8dacf6f58bb8e79ffbb6236bfbd138ecc8d9"
+source = "git+https://github.com/maghoff/wad-map.git#b5121f6c921cf3b9bcb26b970b22b7da4199d0c7"
 dependencies = [
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
