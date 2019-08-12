@@ -161,6 +161,10 @@ impl<'a> State<'a> {
                 let b = transform * (b - pos);
 
                 rendering_state.wall(floor, ceil, a, b, texture);
+
+                if rendering_state.is_complete() {
+                    return;
+                }
             }
         }
     }
