@@ -227,10 +227,47 @@ impl<'a> RenderingState<'a> {
             return;
         }
 
-        let fa = vec3(a.x, floor, a.y);
-        let ca = vec3(a.x, ceil, a.y);
-        let fb = vec3(b.x, floor, b.y);
-        let cb = vec3(b.x, ceil, b.y);
+        let mut fa = vec3(a.x, floor, a.y);
+        let mut ca = vec3(a.x, ceil, a.y);
+        let mut fb = vec3(b.x, floor, b.y);
+        let mut cb = vec3(b.x, ceil, b.y);
+
+        const CLIP_NEAR: f32 = 10.;
+
+        if fa.z <= CLIP_NEAR && fb.z <= CLIP_NEAR {
+            return;
+        }
+
+        let mut ua = 0.;
+        let mut ub = ua + (b - a).magnitude();
+
+        if fa.z < CLIP_NEAR {
+            let d = fb - fa;
+            let u = (CLIP_NEAR - fa.z) / d.z;
+
+            let x = fa.x + u * d.x;
+            fa.x = x;
+            ca.x = x;
+
+            fa.z = CLIP_NEAR;
+            ca.z = CLIP_NEAR;
+
+            ua = ua + (ub - ua) * u;
+        }
+
+        if fb.z < CLIP_NEAR {
+            let d = fa - fb;
+            let u = (CLIP_NEAR - fb.z) / d.z;
+
+            let x = fb.x + u * d.x;
+            fb.x = x;
+            cb.x = x;
+
+            fb.z = CLIP_NEAR;
+            cb.z = CLIP_NEAR;
+
+            ub = ub + (ua - ub) * u;
+        }
 
         let za = fa.z;
         let zb = fb.z;
@@ -243,15 +280,12 @@ impl<'a> RenderingState<'a> {
         let d_ceil = cb - ca;
         let d_floor = fb - fa;
 
-        let ua = 0.;
-        let ub = ua + (b - a).magnitude();
-
         let v_top = 0.;
         let v_bottom = ceil - floor;
 
         let x_range = fa.x.round() as i32..fb.x.round() as i32;
-        let x_ranges = vec![intersect(x_range, 0..320)];
-        // let x_ranges = self.apply_horizontal_clipping(x_range);
+        // let x_ranges = vec![intersect(x_range, 0..320)];
+        let x_ranges = self.apply_horizontal_clipping(x_range);
 
         for x in x_ranges.into_iter().flatten() {
             let t = (x as f32 - fa.x) / d_floor.x;
@@ -259,9 +293,6 @@ impl<'a> RenderingState<'a> {
             let top = ca.y + d_ceil.y * t;
             let bottom = fa.y + d_floor.y * t;
             let height = bottom - top;
-            if height < 0. {
-                continue;
-            }
 
             // Perspective correct interpolation of u coordinate
             // TODO: Derive from fundamental geometry
