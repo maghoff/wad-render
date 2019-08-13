@@ -101,38 +101,15 @@ impl<'a> State<'a> {
         pal.clone_from_slice(&self.playpal[0..768]);
 
         let mut screen = ArrayViewMut2::from_shape((200, 320), buf).unwrap();
-        // put_sprite(&mut screen, 0, 0, &self.titlepic);
         fill(&mut screen, 0);
 
-        // put_sprite(&mut screen, 160, 150, &self.wall);
-
         let mut rendering_state = RenderingState::new(&mut screen);
-
-        let vertices = [
-            // vec2(-640., 800.),
-            // vec2(-640., 1280.),
-            // vec2(640., 1280.),
-            // vec2(640., 800.),
-            vec2(968., -2880.),
-            vec2(1216., -2880.),
-        ];
 
         // Mysterious rotation matrix:
         let transform = cgmath::Matrix2::new(dir.y, dir.x, -dir.x, dir.y);
 
-        let vertices = vertices
-            .into_iter()
-            .map(|&v| transform * (v - pos))
-            .collect::<Vec<_>>();
-
         let floor = -50.;
         let ceil = floor + 128.;
-
-        // let texture = &self.texture_provider.texture(b"BROWN1");
-
-        // rendering_state.wall(floor, ceil, vertices[0], vertices[1], texture);
-        // rendering_state.wall(floor, ceil, vertices[1], vertices[2], texture);
-        // rendering_state.wall(floor, ceil, vertices[2], vertices[3], texture);
 
         for subsector in BspTraverser::new(&self.map.nodes, &self.map.subsectors, pos) {
             let start = subsector.first_seg as usize;
@@ -141,29 +118,41 @@ impl<'a> State<'a> {
                 let linedef = &self.map.linedefs[line_segment.linedef as usize];
                 let portal = linedef.right_sidedef.is_some() && linedef.left_sidedef.is_some();
                 if portal {
-                    continue;
+                    // TODO: Push deferred rendering instructions on a stack somewhere
+                    // continue;
                 }
-
-                let texture = linedef
-                    .right_sidedef
-                    .map(|x| &self.map.sidedefs[x as usize].middle_texture)
-                    .unwrap_or(b"BROWN1\0\0")
-                    .clone();
-                let texture = &self.texture_provider.texture(&texture);
 
                 let a = &self.map.vertexes[line_segment.start_vertex as usize];
                 let b = &self.map.vertexes[line_segment.end_vertex as usize];
 
-                let a = vec2(a.x as _, a.y as _);
-                let b = vec2(b.x as _, b.y as _);
+                let a = vec2(a.x as f32, a.y as f32);
+                let b = vec2(b.x as f32, b.y as f32);
 
-                let a = transform * (a - pos);
-                let b = transform * (b - pos);
+                let right_side = (pos - a).perp_dot(b - a) > 0.;
 
-                rendering_state.wall(floor, ceil, a, b, texture);
+                let sidedef = if right_side {
+                    linedef.right_sidedef
+                } else {
+                    linedef.left_sidedef
+                };
 
-                if rendering_state.is_complete() {
-                    return;
+                if let Some(sidedef) = sidedef {
+                    let sidedef = &self.map.sidedefs[sidedef as usize];
+
+                    let texture = sidedef.middle_texture.clone();
+                    if texture[1] == 0 {
+                        continue;
+                    }
+                    let texture = &self.texture_provider.texture(&texture);
+
+                    let a = transform * (a - pos);
+                    let b = transform * (b - pos);
+
+                    rendering_state.wall(floor, ceil, a, b, texture);
+
+                    if rendering_state.is_complete() {
+                        return;
+                    }
                 }
             }
         }
@@ -226,11 +215,6 @@ impl<'a> RenderingState<'a> {
     }
 
     fn wall(&mut self, floor: f32, ceil: f32, a: Vector2<f32>, b: Vector2<f32>, texture: &Sprite) {
-        let front_face = -a.perp_dot(b - a) > 0.;
-        if !front_face {
-            return;
-        }
-
         let mut fa = vec3(a.x, floor, a.y);
         let mut ca = vec3(a.x, ceil, a.y);
         let mut fb = vec3(b.x, floor, b.y);
