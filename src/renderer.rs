@@ -9,7 +9,7 @@ use wad_gfx::Sprite;
 
 const TAU: f32 = 2. * ::std::f32::consts::PI;
 const PROJECTION_PLANE_WIDTH: f32 = 320.;
-const FOV: f32 = 60. * TAU / 360.;
+const FOV: f32 = 90. * TAU / 360.;
 const PROJECTION_PLANE_HALF_WIDTH: f32 = PROJECTION_PLANE_WIDTH / 2.;
 
 pub struct State<'a> {

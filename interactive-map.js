@@ -99,7 +99,7 @@ function initCamera(cameraDom, initialState, callback) {
 
         const TAU = Math.PI * 2;
         const projection_plane_width = 320.;
-        const fov = 60. * TAU / 360.;
+        const fov = 90. * TAU / 360.;
         const projection_plane_half_width = projection_plane_width / 2.;
         const distance_to_projection_plane = projection_plane_half_width / Math.tan(fov / 2.);
 
