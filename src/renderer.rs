@@ -11,6 +11,7 @@ const TAU: f32 = 2. * ::std::f32::consts::PI;
 const PROJECTION_PLANE_WIDTH: f32 = 320.;
 const FOV: f32 = 90. * TAU / 360.;
 const PROJECTION_PLANE_HALF_WIDTH: f32 = PROJECTION_PLANE_WIDTH / 2.;
+const EYE_HEIGHT: f32 = 40.;
 
 pub struct State<'a> {
     playpal: &'a [u8],
@@ -20,20 +21,14 @@ pub struct State<'a> {
 
 pub struct BspTraverser<'a> {
     nodes: &'a [wad_map::Node],
-    subsectors: &'a [wad_map::Subsector],
     pos: Vector2<f32>,
     state: Vec<wad_map::Child>,
 }
 
 impl<'a> BspTraverser<'a> {
-    fn new(
-        nodes: &'a [wad_map::Node],
-        subsectors: &'a [wad_map::Subsector],
-        pos: Vector2<f32>,
-    ) -> BspTraverser<'a> {
+    fn new(nodes: &'a [wad_map::Node], pos: Vector2<f32>) -> BspTraverser<'a> {
         BspTraverser {
             nodes,
-            subsectors,
             pos,
             state: vec![((nodes.len() - 1) as u16).into()],
         }
@@ -41,16 +36,16 @@ impl<'a> BspTraverser<'a> {
 }
 
 impl<'a> Iterator for BspTraverser<'a> {
-    type Item = &'a wad_map::Subsector;
+    type Item = u16;
 
-    fn next(&mut self) -> Option<&'a wad_map::Subsector> {
+    fn next(&mut self) -> Option<u16> {
         match self.state.pop()? {
-            wad_map::Child::Subsector(s) => Some(&self.subsectors[s as usize]),
+            wad_map::Child::Subsector(s) => Some(s),
             wad_map::Child::Subnode(n) => {
                 let node = &self.nodes[n as usize];
 
                 let view = self.pos - vec2(node.x as f32, node.y as f32);
-                let left = node.dy as f32 * view.x; // How does this work with Doom's fixed point arithmetics?
+                let left = node.dy as f32 * view.x;
                 let right = view.y * node.dx as f32;
 
                 let is_right_side = right < left;
@@ -92,6 +87,44 @@ impl<'a> State<'a> {
         )
     }
 
+    fn floor_height_at(&self, pos: Vector2<f32>) -> f32 {
+        for subsector in BspTraverser::new(&self.map.nodes, pos) {
+            let subsector = &self.map.subsectors[subsector as usize];
+
+            let start = subsector.first_seg as usize;
+            let end = start + subsector.seg_count as usize;
+
+            for line_segment in &self.map.line_segments[start..end] {
+                let linedef = &self.map.linedefs[line_segment.linedef as usize];
+
+                let a = &self.map.vertexes[line_segment.start_vertex as usize];
+                let b = &self.map.vertexes[line_segment.end_vertex as usize];
+
+                let a = vec2(a.x as f32, a.y as f32);
+                let b = vec2(b.x as f32, b.y as f32);
+
+                let reverse = line_segment.direction != 0;
+                let right_side = ((pos - a).perp_dot(b - a) > 0.) ^ reverse;
+
+                let front_sidedef = if right_side {
+                    linedef.right_sidedef
+                } else {
+                    linedef.left_sidedef
+                };
+
+                if let Some(front_sidedef) = front_sidedef {
+                    let front_sidedef = &self.map.sidedefs[front_sidedef as usize];
+
+                    let front_sector = front_sidedef.sector_id;
+                    let front_sector = &self.map.sectors[front_sector as usize];
+
+                    return front_sector.floor_height as f32 + EYE_HEIGHT;
+                }
+            }
+        }
+        unreachable!()
+    }
+
     pub fn render(
         &mut self,
         Input {
@@ -108,18 +141,16 @@ impl<'a> State<'a> {
         // Mysterious rotation matrix:
         let transform = cgmath::Matrix2::new(dir.y, dir.x, -dir.x, dir.y);
 
-        let mut camera_y = None;
+        let camera_y = self.floor_height_at(pos);
 
-        for subsector in BspTraverser::new(&self.map.nodes, &self.map.subsectors, pos) {
+        for subsector in BspTraverser::new(&self.map.nodes, pos) {
+            let subsector = &self.map.subsectors[subsector as usize];
+
             let start = subsector.first_seg as usize;
             let end = start + subsector.seg_count as usize;
+
             for line_segment in &self.map.line_segments[start..end] {
                 let linedef = &self.map.linedefs[line_segment.linedef as usize];
-                let portal = linedef.right_sidedef.is_some() && linedef.left_sidedef.is_some();
-                if portal {
-                    // TODO: Push deferred rendering instructions on a stack somewhere
-                    // continue;
-                }
 
                 let a = &self.map.vertexes[line_segment.start_vertex as usize];
                 let b = &self.map.vertexes[line_segment.end_vertex as usize];
@@ -130,38 +161,40 @@ impl<'a> State<'a> {
                 let reverse = line_segment.direction != 0;
                 let right_side = ((pos - a).perp_dot(b - a) > 0.) ^ reverse;
 
-                let sidedef = if right_side {
-                    linedef.right_sidedef
+                let (front_sidedef, back_sidedef) = if right_side {
+                    (linedef.right_sidedef, linedef.left_sidedef)
                 } else {
-                    linedef.left_sidedef
+                    (linedef.left_sidedef, linedef.right_sidedef)
                 };
 
-                if let Some(sidedef) = sidedef {
-                    let sidedef = &self.map.sidedefs[sidedef as usize];
+                let a = transform * (a - pos);
+                let b = transform * (b - pos);
 
-                    let front_sector = sidedef.sector_id;
-                    let front_sector = &self.map.sectors[front_sector as usize];
+                let portal = front_sidedef.is_some() && back_sidedef.is_some();
 
-                    if camera_y.is_none() {
-                        camera_y = Some(front_sector.floor_height as f32 + 40.);
-                    }
+                if portal {
+                    // TODO: Push deferred rendering instructions on a stack somewhere
+                    // if texture == b"-\0\0\0\0\0\0\0" {
+                    //     continue;
+                    // }
+                } else {
+                    if let Some(front_sidedef) = front_sidedef {
+                        let front_sidedef = &self.map.sidedefs[front_sidedef as usize];
 
-                    let texture = &sidedef.middle_texture;
-                    if texture == b"-\0\0\0\0\0\0\0" {
-                        continue;
-                    }
-                    let texture = &self.texture_provider.texture(texture);
+                        let front_sector = front_sidedef.sector_id;
+                        let front_sector = &self.map.sectors[front_sector as usize];
 
-                    let a = transform * (a - pos);
-                    let b = transform * (b - pos);
+                        let texture = &front_sidedef.middle_texture;
+                        let texture = &self.texture_provider.texture(texture);
 
-                    let floor = front_sector.floor_height as f32 - camera_y.unwrap();
-                    let ceil = front_sector.ceil_height as f32 - camera_y.unwrap();
+                        let floor = front_sector.floor_height as f32 - camera_y;
+                        let ceil = front_sector.ceil_height as f32 - camera_y;
 
-                    rendering_state.wall(floor, ceil, a, b, texture);
+                        rendering_state.wall(floor, ceil, a, b, texture);
 
-                    if rendering_state.is_complete() {
-                        return;
+                        if rendering_state.is_complete() {
+                            return;
+                        }
                     }
                 }
             }
