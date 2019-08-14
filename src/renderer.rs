@@ -108,8 +108,7 @@ impl<'a> State<'a> {
         // Mysterious rotation matrix:
         let transform = cgmath::Matrix2::new(dir.y, dir.x, -dir.x, dir.y);
 
-        let floor = -50.;
-        let ceil = floor + 128.;
+        let mut camera_y = None;
 
         for subsector in BspTraverser::new(&self.map.nodes, &self.map.subsectors, pos) {
             let start = subsector.first_seg as usize;
@@ -128,7 +127,8 @@ impl<'a> State<'a> {
                 let a = vec2(a.x as f32, a.y as f32);
                 let b = vec2(b.x as f32, b.y as f32);
 
-                let right_side = (pos - a).perp_dot(b - a) > 0.;
+                let reverse = line_segment.direction != 0;
+                let right_side = ((pos - a).perp_dot(b - a) > 0.) ^ reverse;
 
                 let sidedef = if right_side {
                     linedef.right_sidedef
@@ -139,14 +139,24 @@ impl<'a> State<'a> {
                 if let Some(sidedef) = sidedef {
                     let sidedef = &self.map.sidedefs[sidedef as usize];
 
-                    let texture = sidedef.middle_texture.clone();
-                    if texture[1] == 0 {
+                    let front_sector = sidedef.sector_id;
+                    let front_sector = &self.map.sectors[front_sector as usize];
+
+                    if camera_y.is_none() {
+                        camera_y = Some(front_sector.floor_height as f32 + 40.);
+                    }
+
+                    let texture = &sidedef.middle_texture;
+                    if texture == b"-\0\0\0\0\0\0\0" {
                         continue;
                     }
-                    let texture = &self.texture_provider.texture(&texture);
+                    let texture = &self.texture_provider.texture(texture);
 
                     let a = transform * (a - pos);
                     let b = transform * (b - pos);
+
+                    let floor = front_sector.floor_height as f32 - camera_y.unwrap();
+                    let ceil = front_sector.ceil_height as f32 - camera_y.unwrap();
 
                     rendering_state.wall(floor, ceil, a, b, texture);
 
