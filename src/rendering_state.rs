@@ -80,6 +80,34 @@ impl<'a> RenderingState<'a> {
         to_render
     }
 
+    fn clip_near(
+        a: Vector2<f32>,
+        b: Vector2<f32>,
+    ) -> Option<(Vector2<f32>, f32, Vector2<f32>, f32)> {
+        const CLIP_NEAR: f32 = 10.;
+
+        if a.y <= CLIP_NEAR && b.y <= CLIP_NEAR {
+            return None;
+        }
+
+        let d = b - a;
+        let len = d.magnitude();
+
+        // a.y + i * d.y = CLIP_NEAR
+        // i * d.y = CLIP_NEAR - a.y
+        // i = (CLIP_NEAR - a.y) / d.y
+        let intersection_u = (CLIP_NEAR - a.y) / d.y;
+        let intersection_p = a + d * intersection_u;
+
+        if a.y < CLIP_NEAR {
+            return Some((intersection_p, intersection_u * len, b, len));
+        } else if b.y < CLIP_NEAR {
+            return Some((a, 0., intersection_p, intersection_u * len));
+        }
+
+        Some((a, 0., b, len))
+    }
+
     pub fn wall(
         &mut self,
         floor: f32,
@@ -88,55 +116,18 @@ impl<'a> RenderingState<'a> {
         b: Vector2<f32>,
         texture: &Sprite,
     ) {
-        let mut fa = vec3(a.x, floor, a.y);
-        let mut ca = vec3(a.x, ceil, a.y);
-        let mut fb = vec3(b.x, floor, b.y);
-        let mut cb = vec3(b.x, ceil, b.y);
+        let (a, ua, b, ub) = match Self::clip_near(a, b) {
+            None => return,
+            Some(x) => x,
+        };
 
-        const CLIP_NEAR: f32 = 10.;
+        let za = a.y;
+        let zb = b.y;
 
-        if fa.z <= CLIP_NEAR && fb.z <= CLIP_NEAR {
-            return;
-        }
-
-        let mut ua = 0.;
-        let mut ub = ua + (b - a).magnitude();
-
-        if fa.z < CLIP_NEAR {
-            let d = fb - fa;
-            let u = (CLIP_NEAR - fa.z) / d.z;
-
-            let x = fa.x + u * d.x;
-            fa.x = x;
-            ca.x = x;
-
-            fa.z = CLIP_NEAR;
-            ca.z = CLIP_NEAR;
-
-            ua = ua + (ub - ua) * u;
-        }
-
-        if fb.z < CLIP_NEAR {
-            let d = fa - fb;
-            let u = (CLIP_NEAR - fb.z) / d.z;
-
-            let x = fb.x + u * d.x;
-            fb.x = x;
-            cb.x = x;
-
-            fb.z = CLIP_NEAR;
-            cb.z = CLIP_NEAR;
-
-            ub = ub + (ua - ub) * u;
-        }
-
-        let za = fa.z;
-        let zb = fb.z;
-
-        let fa = self.project(fa);
-        let ca = self.project(ca);
-        let fb = self.project(fb);
-        let cb = self.project(cb);
+        let fa = self.project(vec3(a.x, floor, a.y));
+        let ca = self.project(vec3(a.x, ceil, a.y));
+        let fb = self.project(vec3(b.x, floor, b.y));
+        let cb = self.project(vec3(b.x, ceil, b.y));
 
         let d_ceil = cb - ca;
         let d_floor = fb - fa;
@@ -200,55 +191,18 @@ impl<'a> RenderingState<'a> {
         _upper: &Option<(f32, f32, Sprite)>,
         _lower: &Option<(f32, f32, Sprite)>,
     ) {
-        let mut fa = vec3(a.x, floor, a.y);
-        let mut ca = vec3(a.x, ceil, a.y);
-        let mut fb = vec3(b.x, floor, b.y);
-        let mut cb = vec3(b.x, ceil, b.y);
+        let (a, ua, b, ub) = match Self::clip_near(a, b) {
+            None => return,
+            Some(x) => x,
+        };
 
-        const CLIP_NEAR: f32 = 10.;
+        let za = a.y;
+        let zb = b.y;
 
-        if fa.z <= CLIP_NEAR && fb.z <= CLIP_NEAR {
-            return;
-        }
-
-        let mut ua = 0.;
-        let mut ub = ua + (b - a).magnitude();
-
-        if fa.z < CLIP_NEAR {
-            let d = fb - fa;
-            let u = (CLIP_NEAR - fa.z) / d.z;
-
-            let x = fa.x + u * d.x;
-            fa.x = x;
-            ca.x = x;
-
-            fa.z = CLIP_NEAR;
-            ca.z = CLIP_NEAR;
-
-            ua = ua + (ub - ua) * u;
-        }
-
-        if fb.z < CLIP_NEAR {
-            let d = fa - fb;
-            let u = (CLIP_NEAR - fb.z) / d.z;
-
-            let x = fb.x + u * d.x;
-            fb.x = x;
-            cb.x = x;
-
-            fb.z = CLIP_NEAR;
-            cb.z = CLIP_NEAR;
-
-            ub = ub + (ua - ub) * u;
-        }
-
-        let za = fa.z;
-        let zb = fb.z;
-
-        let fa = self.project(fa);
-        let ca = self.project(ca);
-        let fb = self.project(fb);
-        let cb = self.project(cb);
+        let fa = self.project(vec3(a.x, floor, a.y));
+        let ca = self.project(vec3(a.x, ceil, a.y));
+        let fb = self.project(vec3(b.x, floor, b.y));
+        let cb = self.project(vec3(b.x, ceil, b.y));
 
         let d_ceil = cb - ca;
         let d_floor = fb - fa;
