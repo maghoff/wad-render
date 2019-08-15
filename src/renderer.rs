@@ -179,11 +179,7 @@ impl<'a> State<'a> {
                         - camera_y;
 
                     rendering_state.portal(floor, ceil, a, b, &upper, &lower);
-
-                // TODO: Push deferred rendering instructions on a stack somewhere
-                // if texture == b"-\0\0\0\0\0\0\0" {
-                //     continue;
-                // }
+                // TODO: Defer rendering of middle texture
                 } else {
                     if let Some(front_sidedef) = front_sidedef {
                         let front_sidedef = &self.map.sidedefs[front_sidedef as usize];
