@@ -3,6 +3,7 @@
 set -e
 
 export RUSTFLAGS=
+export CARGO_INCREMENTAL=0
 
 cargo +nightly build --target wasm32-unknown-unknown --release
 wasm-gc target/wasm32-unknown-unknown/release/wad_render.wasm -o wad_render.gc.wasm
