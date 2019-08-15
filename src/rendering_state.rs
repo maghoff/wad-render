@@ -108,6 +108,43 @@ impl<'a> RenderingState<'a> {
         Some((a, 0., b, len))
     }
 
+    fn draw_texture_col(
+        &mut self,
+        x: i32,
+        top: f32,
+        bottom: i32,
+        scale: f32,
+        texture: &Sprite,
+        column: u32,
+    ) {
+        if bottom <= top as i32 {
+            return;
+        }
+
+        for span in texture.col(column) {
+            let span_y_top = top + span.top as f32 * scale;
+            let span_y_bottom = top + scale * (span.top as u32 + span.pixels.len() as u32) as f32;
+            let dy = span_y_bottom - span_y_top;
+
+            let y_range =
+                span_y_top.round() as i32..std::cmp::min(span_y_bottom.round() as i32, bottom);
+
+            // Vertical clipping
+            // let y_range = intersect(y_range, 0..200); // Redundant
+            let y_range = intersect(y_range, self.v_open[x as usize].clone());
+
+            for y in y_range {
+                let s = (y as f32 - span_y_top) / dy * span.pixels.len() as f32;
+                self.framebuffer[[y as usize, x as usize]] = span.pixels[s as usize];
+            }
+        }
+
+        let rendered_to = top + texture.height() as f32 * scale;
+        if bottom >= rendered_to as i32 {
+            self.draw_texture_col(x, rendered_to, bottom, scale, texture, column);
+        }
+    }
+
     pub fn wall(
         &mut self,
         floor: f32,
@@ -132,8 +169,9 @@ impl<'a> RenderingState<'a> {
         let d_ceil = cb - ca;
         let d_floor = fb - fa;
 
-        let v_top = 0.;
-        let v_bottom = ceil - floor;
+        let scale_a = self.distance_to_projection_plane / a.y;
+        let scale_b = self.distance_to_projection_plane / b.y;
+        let dscale = scale_b - scale_a;
 
         let x_range = fa.x.round() as i32..fb.x.round() as i32;
         // let x_ranges = vec![intersect(x_range, 0..320)];
@@ -144,7 +182,6 @@ impl<'a> RenderingState<'a> {
 
             let top = ca.y + d_ceil.y * t;
             let bottom = fa.y + d_floor.y * t;
-            let height = bottom - top;
 
             // Perspective correct interpolation of u coordinate
             // TODO: Derive from fundamental geometry
@@ -152,33 +189,9 @@ impl<'a> RenderingState<'a> {
 
             let u = (u.round() as i32).rem_euclid(texture.width() as i32);
 
-            // HITCH! Transparency does not make sense in the first rendering pass!
-            // Solid walls must be treated differently from transparent walls!
-            for span in texture.col(u as u32) {
-                // Revisit. Clean up. FIXME: Does not work with different v ranges
-                let span_y_top = top + height * (span.top as f32 / texture.height() as f32);
-                let span_y_bottom = top
-                    + height
-                        * ((span.top as u32 + span.pixels.len() as u32) as f32
-                            / texture.height() as f32);
-                let dy = span_y_bottom - span_y_top;
-
-                let y_range = span_y_top.round() as i32..span_y_bottom.round() as i32;
-
-                // Vertical clipping
-                // let y_range = intersect(y_range, 0..200); // Redundant
-                let y_range = intersect(y_range, self.v_open[x as usize].clone());
-
-                for y in y_range {
-                    let s = (y as f32 - span_y_top) / dy * span.pixels.len() as f32;
-                    self.framebuffer[[y as usize, x as usize]] = span.pixels[s as usize];
-                }
-            }
+            self.draw_texture_col(x, top, bottom as _, scale_a + dscale * t, texture, u as u32);
 
             // TODO Yield visplanes
-
-            // Vertical clipping. Walls (not portals) always cover the full height.
-            self.v_open[x as usize] = 0..0;
         }
     }
 
@@ -188,8 +201,8 @@ impl<'a> RenderingState<'a> {
         ceil: f32,
         a: Vector2<f32>,
         b: Vector2<f32>,
-        _upper: &Option<(f32, f32, Sprite)>,
-        _lower: &Option<(f32, f32, Sprite)>,
+        upper: &Option<(f32, f32, Sprite)>,
+        lower: &Option<(f32, f32, Sprite)>,
     ) {
         let (a, ua, b, ub) = match Self::clip_near(a, b) {
             None => return,
@@ -207,8 +220,9 @@ impl<'a> RenderingState<'a> {
         let d_ceil = cb - ca;
         let d_floor = fb - fa;
 
-        let v_top = 0.;
-        let v_bottom = ceil - floor;
+        let scale_a = self.distance_to_projection_plane / a.y;
+        let scale_b = self.distance_to_projection_plane / b.y;
+        let dscale = scale_b - scale_a;
 
         let x_range = fa.x.round() as i32..fb.x.round() as i32;
         // let x_ranges = vec![intersect(x_range, 0..320)];
@@ -219,43 +233,38 @@ impl<'a> RenderingState<'a> {
 
             let top = ca.y + d_ceil.y * t;
             let bottom = fa.y + d_floor.y * t;
-            let height = bottom - top;
+            let scale = scale_a + dscale * t;
 
-            // Perspective correct interpolation of u coordinate
-            // TODO: Derive from fundamental geometry
             let u = ((1. - t) * ua / za + t * ub / zb) / ((1. - t) / za + t / zb);
 
-            // let u = (u.round() as i32).rem_euclid(texture.width() as i32);
+            if let Some((top, bottom, texture)) = upper {
+                let u = (u.round() as i32).rem_euclid(texture.width() as i32);
+                self.draw_texture_col(
+                    x,
+                    100. - top * scale,
+                    (100. - bottom * scale) as _,
+                    scale,
+                    texture,
+                    u as u32,
+                );
+            }
 
-            // // HITCH! Transparency does not make sense in the first rendering pass!
-            // // Solid walls must be treated differently from transparent walls!
-            // for span in texture.col(u as u32) {
-            //     // Revisit. Clean up. FIXME: Does not work with different v ranges
-            //     let span_y_top = top + height * (span.top as f32 / texture.height() as f32);
-            //     let span_y_bottom = top
-            //         + height
-            //             * ((span.top as u32 + span.pixels.len() as u32) as f32
-            //                 / texture.height() as f32);
-            //     let dy = span_y_bottom - span_y_top;
-
-            //     let y_range = span_y_top.round() as i32..span_y_bottom.round() as i32;
-
-            //     // Vertical clipping
-            //     // let y_range = intersect(y_range, 0..200); // Redundant
-            //     let y_range = intersect(y_range, self.v_open[x as usize].clone());
-
-            //     for y in y_range {
-            //         let s = (y as f32 - span_y_top) / dy * span.pixels.len() as f32;
-            //         self.framebuffer[[y as usize, x as usize]] = span.pixels[s as usize];
-            //     }
-            // }
+            if let Some((top, bottom, texture)) = lower {
+                let u = (u.round() as i32).rem_euclid(texture.width() as i32);
+                self.draw_texture_col(
+                    x,
+                    100. - top * scale,
+                    (100. - bottom * scale) as _,
+                    scale,
+                    texture,
+                    u as u32,
+                );
+            }
 
             // TODO Yield visplanes
 
             self.v_open[x as usize] =
                 intersect(self.v_open[x as usize].clone(), top as _..bottom as _);
-
-            // self.v_open[x as usize] = 0..0;
         }
     }
 }

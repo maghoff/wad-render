@@ -140,8 +140,8 @@ impl<'a> State<'a> {
                             .get_texture(&front_sidedef.upper_texture)
                             .map(|texture| {
                                 (
-                                    back_sector.ceil_height as f32,
-                                    front_sector.ceil_height as f32,
+                                    front_sector.ceil_height as f32 - camera_y,
+                                    back_sector.ceil_height as f32 - camera_y,
                                     texture,
                                 )
                             })
@@ -154,8 +154,8 @@ impl<'a> State<'a> {
                             .get_texture(&front_sidedef.lower_texture)
                             .map(|texture| {
                                 (
-                                    front_sector.floor_height as f32,
-                                    back_sector.floor_height as f32,
+                                    back_sector.floor_height as f32 - camera_y,
+                                    front_sector.floor_height as f32 - camera_y,
                                     texture,
                                 )
                             })
