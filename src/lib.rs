@@ -3,7 +3,9 @@ extern crate wee_alloc;
 use cgmath::{vec2, Vector2};
 use std::{mem, slice};
 
+mod bsp_traverser;
 mod renderer;
+mod rendering_state;
 mod util;
 
 const SCREEN_WIDTH: usize = 320;
