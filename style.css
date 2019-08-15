@@ -12,6 +12,11 @@ body {
     margin: 0;
 }
 
+body>div {
+    margin-left: auto;
+    margin-right: auto;
+}
+
 #screen {
     width: 640px;
     height: 480px;
