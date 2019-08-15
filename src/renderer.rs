@@ -141,7 +141,11 @@ impl<'a> State<'a> {
                             .map(|texture| {
                                 (
                                     front_sector.ceil_height as f32 - camera_y,
-                                    back_sector.ceil_height as f32 - camera_y,
+                                    std::cmp::max(
+                                        back_sector.ceil_height,
+                                        front_sector.floor_height,
+                                    ) as f32
+                                        - camera_y,
                                     texture,
                                 )
                             })
@@ -154,7 +158,11 @@ impl<'a> State<'a> {
                             .get_texture(&front_sidedef.lower_texture)
                             .map(|texture| {
                                 (
-                                    back_sector.floor_height as f32 - camera_y,
+                                    std::cmp::min(
+                                        back_sector.floor_height,
+                                        front_sector.ceil_height,
+                                    ) as f32
+                                        - camera_y,
                                     front_sector.floor_height as f32 - camera_y,
                                     texture,
                                 )
