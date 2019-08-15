@@ -179,19 +179,41 @@ impl<'a> State<'a> {
                     let front_sector = &self.map.sectors[front_sidedef.sector_id as usize];
                     let back_sector = &self.map.sectors[back_sidedef.sector_id as usize];
 
-                    /*
+                    let _ = self
+                        .texture_provider
+                        .load_texture(&front_sidedef.upper_texture);
+                    let _ = self
+                        .texture_provider
+                        .load_texture(&front_sidedef.lower_texture);
+
                     let upper = if front_sector.ceil_height > back_sector.ceil_height {
-                        Some((back_sector.ceil_height as f32, front_sector.ceil_height as f32, self.texture_provider.texture(&front_sidedef.upper_texture)))
+                        self.texture_provider
+                            .get_texture(&front_sidedef.upper_texture)
+                            .map(|texture| {
+                                (
+                                    back_sector.ceil_height as f32,
+                                    front_sector.ceil_height as f32,
+                                    texture,
+                                )
+                            })
                     } else {
                         None
                     };
 
                     let lower = if front_sector.floor_height < back_sector.floor_height {
-                        Some((front_sector.floor_height as f32, back_sector.floor_height as f32, self.texture_provider.texture(&front_sidedef.lower_texture)))
+                        self.texture_provider
+                            .get_texture(&front_sidedef.lower_texture)
+                            .map(|texture| {
+                                (
+                                    front_sector.floor_height as f32,
+                                    back_sector.floor_height as f32,
+                                    texture,
+                                )
+                            })
                     } else {
                         None
                     };
-                    */
+
                     let floor = std::cmp::max(front_sector.floor_height, back_sector.floor_height)
                         as f32
                         - camera_y;
@@ -199,7 +221,7 @@ impl<'a> State<'a> {
                         as f32
                         - camera_y;
 
-                    rendering_state.portal(floor, ceil, a, b /*, &upper, &lower*/);
+                    rendering_state.portal(floor, ceil, a, b, &upper, &lower);
 
                 // TODO: Push deferred rendering instructions on a stack somewhere
                 // if texture == b"-\0\0\0\0\0\0\0" {
@@ -213,7 +235,8 @@ impl<'a> State<'a> {
                         let front_sector = &self.map.sectors[front_sector as usize];
 
                         let texture = &front_sidedef.middle_texture;
-                        let texture = &self.texture_provider.texture(texture);
+                        self.texture_provider.load_texture(texture).unwrap();
+                        let texture = &self.texture_provider.get_texture(texture).unwrap();
 
                         let floor = front_sector.floor_height as f32 - camera_y;
                         let ceil = front_sector.ceil_height as f32 - camera_y;
@@ -408,7 +431,9 @@ impl<'a> RenderingState<'a> {
         floor: f32,
         ceil: f32,
         a: Vector2<f32>,
-        b: Vector2<f32>, /*upper: &Option<(f32, f32, Sprite)>, lower: &Option<(f32, f32, Sprite)>*/
+        b: Vector2<f32>,
+        _upper: &Option<(f32, f32, Sprite)>,
+        _lower: &Option<(f32, f32, Sprite)>,
     ) {
         let mut fa = vec3(a.x, floor, a.y);
         let mut ca = vec3(a.x, ceil, a.y);

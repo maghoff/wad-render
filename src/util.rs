@@ -110,21 +110,20 @@ impl<'a> TextureProvider<'a> {
         None
     }
 
-    pub fn texture(&mut self, id: impl Into<wad::EntryId>) -> Sprite {
-        self.maybe_texture(id.into()).unwrap()
+    pub fn get_texture(&self, id: impl Into<wad::EntryId>) -> Option<Sprite> {
+        self.cache.get(&id.into()).map(|x| Sprite::new(x))
     }
 
-    pub fn maybe_texture(&mut self, id: impl Into<wad::EntryId>) -> Option<Sprite> {
+    pub fn load_texture(&mut self, id: impl Into<wad::EntryId>) -> Result<(), ()> {
         let id = id.into();
-        let texture = self.find_texture(id)?;
+        let texture = self.find_texture(id).ok_or(())?;
         let patch_provider = &self.patch_provider;
 
-        let data = self
-            .cache
+        self.cache
             .entry(id)
             .or_insert_with(|| wad_gfx::render_texture(texture, patch_provider));
 
-        Some(Sprite::new(data))
+        Ok(())
     }
 }
 
