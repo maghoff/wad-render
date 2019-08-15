@@ -179,7 +179,13 @@ impl<'a> State<'a> {
                         - camera_y;
 
                     rendering_state.portal(floor, ceil, a, b, &upper, &lower);
-                // TODO: Defer rendering of middle texture
+
+                    // TODO: Defer rendering of middle texture
+                    let texture = &front_sidedef.middle_texture;
+                    let _ = self.texture_provider.load_texture(texture);
+                    if let Some(texture) = &self.texture_provider.get_texture(texture) {
+                        rendering_state.wall(floor, ceil, a, b, texture);
+                    }
                 } else {
                     if let Some(front_sidedef) = front_sidedef {
                         let front_sidedef = &self.map.sidedefs[front_sidedef as usize];
