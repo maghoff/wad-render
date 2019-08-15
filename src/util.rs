@@ -111,8 +111,12 @@ impl<'a> TextureProvider<'a> {
     }
 
     pub fn texture(&mut self, id: impl Into<wad::EntryId>) -> Sprite {
+        self.maybe_texture(id.into()).unwrap()
+    }
+
+    pub fn maybe_texture(&mut self, id: impl Into<wad::EntryId>) -> Option<Sprite> {
         let id = id.into();
-        let texture = self.find_texture(id).unwrap();
+        let texture = self.find_texture(id)?;
         let patch_provider = &self.patch_provider;
 
         let data = self
@@ -120,7 +124,7 @@ impl<'a> TextureProvider<'a> {
             .entry(id)
             .or_insert_with(|| wad_gfx::render_texture(texture, patch_provider));
 
-        Sprite::new(data)
+        Some(Sprite::new(data))
     }
 }
 

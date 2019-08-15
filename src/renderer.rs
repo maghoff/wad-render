@@ -173,10 +173,38 @@ impl<'a> State<'a> {
                 let portal = front_sidedef.is_some() && back_sidedef.is_some();
 
                 if portal {
-                    // TODO: Push deferred rendering instructions on a stack somewhere
-                    // if texture == b"-\0\0\0\0\0\0\0" {
-                    //     continue;
-                    // }
+                    let front_sidedef = &self.map.sidedefs[front_sidedef.unwrap() as usize];
+                    let back_sidedef = &self.map.sidedefs[back_sidedef.unwrap() as usize];
+
+                    let front_sector = &self.map.sectors[front_sidedef.sector_id as usize];
+                    let back_sector = &self.map.sectors[back_sidedef.sector_id as usize];
+
+                    /*
+                    let upper = if front_sector.ceil_height > back_sector.ceil_height {
+                        Some((back_sector.ceil_height as f32, front_sector.ceil_height as f32, self.texture_provider.texture(&front_sidedef.upper_texture)))
+                    } else {
+                        None
+                    };
+
+                    let lower = if front_sector.floor_height < back_sector.floor_height {
+                        Some((front_sector.floor_height as f32, back_sector.floor_height as f32, self.texture_provider.texture(&front_sidedef.lower_texture)))
+                    } else {
+                        None
+                    };
+                    */
+                    let floor = std::cmp::max(front_sector.floor_height, back_sector.floor_height)
+                        as f32
+                        - camera_y;
+                    let ceil = std::cmp::min(front_sector.ceil_height, back_sector.ceil_height)
+                        as f32
+                        - camera_y;
+
+                    rendering_state.portal(floor, ceil, a, b /*, &upper, &lower*/);
+
+                // TODO: Push deferred rendering instructions on a stack somewhere
+                // if texture == b"-\0\0\0\0\0\0\0" {
+                //     continue;
+                // }
                 } else {
                     if let Some(front_sidedef) = front_sidedef {
                         let front_sidedef = &self.map.sidedefs[front_sidedef as usize];
@@ -191,12 +219,12 @@ impl<'a> State<'a> {
                         let ceil = front_sector.ceil_height as f32 - camera_y;
 
                         rendering_state.wall(floor, ceil, a, b, texture);
-
-                        if rendering_state.is_complete() {
-                            return;
-                        }
                     }
                 }
+            }
+
+            if rendering_state.is_complete() {
+                return;
             }
         }
     }
@@ -254,6 +282,20 @@ impl<'a> RenderingState<'a> {
         }
 
         self.h_open = clipped;
+        to_render
+    }
+
+    fn horizontally_clip(&self, r: Range<i32>) -> Vec<Range<i32>> {
+        let mut to_render = vec![];
+
+        for c in self.h_open.iter() {
+            let i = intersect(c.clone(), r.clone());
+
+            if !is_empty(&i) {
+                to_render.push(i);
+            }
+        }
+
         to_render
     }
 
@@ -358,6 +400,118 @@ impl<'a> RenderingState<'a> {
 
             // Vertical clipping. Walls (not portals) always cover the full height.
             self.v_open[x as usize] = 0..0;
+        }
+    }
+
+    fn portal(
+        &mut self,
+        floor: f32,
+        ceil: f32,
+        a: Vector2<f32>,
+        b: Vector2<f32>, /*upper: &Option<(f32, f32, Sprite)>, lower: &Option<(f32, f32, Sprite)>*/
+    ) {
+        let mut fa = vec3(a.x, floor, a.y);
+        let mut ca = vec3(a.x, ceil, a.y);
+        let mut fb = vec3(b.x, floor, b.y);
+        let mut cb = vec3(b.x, ceil, b.y);
+
+        const CLIP_NEAR: f32 = 10.;
+
+        if fa.z <= CLIP_NEAR && fb.z <= CLIP_NEAR {
+            return;
+        }
+
+        let mut ua = 0.;
+        let mut ub = ua + (b - a).magnitude();
+
+        if fa.z < CLIP_NEAR {
+            let d = fb - fa;
+            let u = (CLIP_NEAR - fa.z) / d.z;
+
+            let x = fa.x + u * d.x;
+            fa.x = x;
+            ca.x = x;
+
+            fa.z = CLIP_NEAR;
+            ca.z = CLIP_NEAR;
+
+            ua = ua + (ub - ua) * u;
+        }
+
+        if fb.z < CLIP_NEAR {
+            let d = fa - fb;
+            let u = (CLIP_NEAR - fb.z) / d.z;
+
+            let x = fb.x + u * d.x;
+            fb.x = x;
+            cb.x = x;
+
+            fb.z = CLIP_NEAR;
+            cb.z = CLIP_NEAR;
+
+            ub = ub + (ua - ub) * u;
+        }
+
+        let za = fa.z;
+        let zb = fb.z;
+
+        let fa = self.project(fa);
+        let ca = self.project(ca);
+        let fb = self.project(fb);
+        let cb = self.project(cb);
+
+        let d_ceil = cb - ca;
+        let d_floor = fb - fa;
+
+        let v_top = 0.;
+        let v_bottom = ceil - floor;
+
+        let x_range = fa.x.round() as i32..fb.x.round() as i32;
+        // let x_ranges = vec![intersect(x_range, 0..320)];
+        let x_ranges = self.horizontally_clip(x_range);
+
+        for x in x_ranges.into_iter().flatten() {
+            let t = (x as f32 - fa.x) / d_floor.x;
+
+            let top = ca.y + d_ceil.y * t;
+            let bottom = fa.y + d_floor.y * t;
+            let height = bottom - top;
+
+            // Perspective correct interpolation of u coordinate
+            // TODO: Derive from fundamental geometry
+            let u = ((1. - t) * ua / za + t * ub / zb) / ((1. - t) / za + t / zb);
+
+            // let u = (u.round() as i32).rem_euclid(texture.width() as i32);
+
+            // // HITCH! Transparency does not make sense in the first rendering pass!
+            // // Solid walls must be treated differently from transparent walls!
+            // for span in texture.col(u as u32) {
+            //     // Revisit. Clean up. FIXME: Does not work with different v ranges
+            //     let span_y_top = top + height * (span.top as f32 / texture.height() as f32);
+            //     let span_y_bottom = top
+            //         + height
+            //             * ((span.top as u32 + span.pixels.len() as u32) as f32
+            //                 / texture.height() as f32);
+            //     let dy = span_y_bottom - span_y_top;
+
+            //     let y_range = span_y_top.round() as i32..span_y_bottom.round() as i32;
+
+            //     // Vertical clipping
+            //     // let y_range = intersect(y_range, 0..200); // Redundant
+            //     let y_range = intersect(y_range, self.v_open[x as usize].clone());
+
+            //     for y in y_range {
+            //         let s = (y as f32 - span_y_top) / dy * span.pixels.len() as f32;
+            //         self.framebuffer[[y as usize, x as usize]] = span.pixels[s as usize];
+            //     }
+            // }
+
+            // TODO Yield visplanes
+
+            self.v_open[x as usize] =
+                intersect(self.v_open[x as usize].clone(), top as _..bottom as _);
+
+            // self.v_open[x as usize] = 0..0;
         }
     }
 }
