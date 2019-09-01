@@ -7,11 +7,21 @@ use wad_gfx::Sprite;
 const TAU: f32 = 2. * ::std::f32::consts::PI;
 const EYE_HEIGHT: f32 = 40.;
 
+struct DeferredWall {
+    floor: f32,
+    ceil: f32,
+    a: Vector2<f32>,
+    b: Vector2<f32>,
+    texture: [u8; 8],
+    clip_state: ClipState,
+}
+
 pub struct State<'a> {
     playpal: &'a [u8],
     pisga0: Sprite<'a>,
     texture_provider: TextureProvider<'a>,
     map: wad_map::Map,
+    deferred_walls: Vec<DeferredWall>,
 }
 
 impl<'a> State<'a> {
@@ -21,6 +31,7 @@ impl<'a> State<'a> {
             pisga0: Sprite::new(wad.by_id(b"PISGA0").unwrap()),
             texture_provider: TextureProvider::new(wad.as_slice()),
             map: wad_map::read_map(&wad.as_slice(), "E1M1").unwrap(),
+            deferred_walls: vec![],
         }
     }
 
@@ -184,12 +195,14 @@ impl<'a> State<'a> {
 
                         rendering_state.portal(floor, ceil, a, b, &upper, &lower);
 
-                        // TODO: Defer rendering of middle texture
-                        let texture = &front_sidedef.middle_texture;
-                        let _ = self.texture_provider.load_texture(texture);
-                        if let Some(texture) = &self.texture_provider.get_texture(texture) {
-                            rendering_state.wall(floor, ceil, a, b, texture);
-                        }
+                        self.deferred_walls.push(DeferredWall {
+                            floor,
+                            ceil,
+                            a,
+                            b,
+                            texture: front_sidedef.middle_texture,
+                            clip_state: rendering_state.get_clip_state(),
+                        });
                     } else {
                         if let Some(front_sidedef) = front_sidedef {
                             let front_sidedef = &self.map.sidedefs[front_sidedef as usize];
@@ -213,7 +226,22 @@ impl<'a> State<'a> {
                     break 'outer;
                 }
             }
+
+            for deferred_wall in self.deferred_walls.drain(..).rev() {
+                let _ = self.texture_provider.load_texture(&deferred_wall.texture);
+                if let Some(texture) = &self.texture_provider.get_texture(&deferred_wall.texture) {
+                    rendering_state.set_clip_state(deferred_wall.clip_state);
+                    rendering_state.wall(
+                        deferred_wall.floor,
+                        deferred_wall.ceil,
+                        deferred_wall.a,
+                        deferred_wall.b,
+                        texture,
+                    );
+                }
+            }
         }
+
         let mut screen = ArrayViewMut2::from_shape((200, 320), buf).unwrap();
         put_sprite(&mut screen, 0, 32, &self.pisga0);
     }

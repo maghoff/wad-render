@@ -4,6 +4,7 @@ use cgmath::prelude::*;
 use cgmath::{vec2, vec3, Vector2, Vector3};
 use ndarray::prelude::*;
 use std::ops::Range;
+use std::rc::Rc;
 use wad_gfx::Sprite;
 
 const TAU: f32 = 2. * ::std::f32::consts::PI;
@@ -11,11 +12,16 @@ const PROJECTION_PLANE_WIDTH: f32 = 320.;
 const FOV: f32 = 90. * TAU / 360.;
 const PROJECTION_PLANE_HALF_WIDTH: f32 = PROJECTION_PLANE_WIDTH / 2.;
 
+pub struct ClipState {
+    h_open: Rc<Vec<Range<i32>>>,
+    v_open: Rc<[Range<i32>; 320]>,
+}
+
 pub struct RenderingState<'a> {
     distance_to_projection_plane: f32,
     framebuffer: &'a mut ArrayViewMut2<'a, u8>,
-    h_open: Vec<Range<i32>>,
-    v_open: [Range<i32>; 320],
+    h_open: Rc<Vec<Range<i32>>>,
+    v_open: Rc<[Range<i32>; 320]>,
 }
 
 impl<'a> RenderingState<'a> {
@@ -23,9 +29,21 @@ impl<'a> RenderingState<'a> {
         RenderingState {
             distance_to_projection_plane: PROJECTION_PLANE_HALF_WIDTH / (FOV / 2.).tan(),
             framebuffer,
-            h_open: vec![0..320],
-            v_open: array![0..200; 320],
+            h_open: Rc::new(vec![0..320]),
+            v_open: Rc::new(array![0..200; 320]),
         }
+    }
+
+    pub fn get_clip_state(&self) -> ClipState {
+        ClipState {
+            h_open: self.h_open.clone(),
+            v_open: self.v_open.clone(),
+        }
+    }
+
+    pub fn set_clip_state(&mut self, clip_state: ClipState) {
+        self.h_open = clip_state.h_open;
+        self.v_open = clip_state.v_open;
     }
 
     fn project(&self, p: Vector3<f32>) -> Vector2<f32> {
@@ -43,8 +61,9 @@ impl<'a> RenderingState<'a> {
 
     fn horizontally_mark_as_rendered(&mut self, r: Range<i32>) {
         let mut clipped = vec![];
+        let h_open = Rc::make_mut(&mut self.h_open);
 
-        for c in self.h_open.drain(..).into_iter() {
+        for c in h_open.drain(..).into_iter() {
             let i = intersect(c.clone(), r.clone());
 
             if is_empty(&i) {
@@ -59,7 +78,7 @@ impl<'a> RenderingState<'a> {
             }
         }
 
-        self.h_open = clipped;
+        *h_open = clipped;
     }
 
     fn horizontally_clip(&self, r: Range<i32>) -> Vec<Range<i32>> {
@@ -261,8 +280,15 @@ impl<'a> RenderingState<'a> {
 
             // TODO Yield visplanes
 
-            self.v_open[x as usize] =
-                intersect(self.v_open[x as usize].clone(), top as _..bottom as _);
+            let v_clipped = intersect(
+                self.v_open[x as usize].clone(),
+                top.round() as _..bottom.round() as _,
+            );
+
+            if v_clipped != self.v_open[x as usize] {
+                let v_open = Rc::make_mut(&mut self.v_open);
+                v_open[x as usize] = v_clipped;
+            }
         }
     }
 }
