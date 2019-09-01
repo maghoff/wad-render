@@ -41,8 +41,7 @@ impl<'a> RenderingState<'a> {
         self.h_open.is_empty()
     }
 
-    fn apply_horizontal_clipping(&mut self, r: Range<i32>) -> Vec<Range<i32>> {
-        let mut to_render = vec![];
+    fn horizontally_mark_as_rendered(&mut self, r: Range<i32>) {
         let mut clipped = vec![];
 
         for c in self.h_open.drain(..).into_iter() {
@@ -57,13 +56,10 @@ impl<'a> RenderingState<'a> {
                 if i.end < c.end {
                     clipped.push(i.end..c.end);
                 }
-
-                to_render.push(i);
             }
         }
 
         self.h_open = clipped;
-        to_render
     }
 
     fn horizontally_clip(&self, r: Range<i32>) -> Vec<Range<i32>> {
@@ -174,8 +170,11 @@ impl<'a> RenderingState<'a> {
         let dscale = scale_b - scale_a;
 
         let x_range = fa.x.round() as i32..fb.x.round() as i32;
-        // let x_ranges = vec![intersect(x_range, 0..320)];
-        let x_ranges = self.apply_horizontal_clipping(x_range);
+        let x_ranges = self.horizontally_clip(x_range.clone());
+
+        if !x_ranges.is_empty() {
+            self.horizontally_mark_as_rendered(x_range);
+        }
 
         for x in x_ranges.into_iter().flatten() {
             let t = (x as f32 - fa.x) / d_floor.x;
@@ -225,7 +224,6 @@ impl<'a> RenderingState<'a> {
         let dscale = scale_b - scale_a;
 
         let x_range = fa.x.round() as i32..fb.x.round() as i32;
-        // let x_ranges = vec![intersect(x_range, 0..320)];
         let x_ranges = self.horizontally_clip(x_range);
 
         for x in x_ranges.into_iter().flatten() {
