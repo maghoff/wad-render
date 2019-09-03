@@ -19,28 +19,32 @@ function draggable(node, callback) {
         ev.preventDefault();
         ev.stopPropagation();
     });
-    node.addEventListener("mousedown", ev => {
+    node.addEventListener("pointerdown", ev => {
         ev.preventDefault();
         ev.stopPropagation();
+
+        node.onpointermove = ev => {
+            if (!dragging) return;
+            ev.preventDefault();
+            ev.stopPropagation();
+
+            const tr = svgPoint(node, ev.x, ev.y);
+            callback(tr.x, tr.y);
+        };
 
         node.classList.add("drag");
-        node.setCapture(true);
+        node.setPointerCapture(ev.pointerId);
         dragging = true;
     });
-    node.addEventListener("mousemove", ev => {
+    node.addEventListener("pointerup", ev => {
         if (!dragging) return;
         ev.preventDefault();
         ev.stopPropagation();
 
-        const tr = svgPoint(node, ev.x, ev.y);
-        callback(tr.x, tr.y);
-    });
-    node.addEventListener("mouseup", ev => {
-        if (!dragging) return;
-        ev.preventDefault();
-        ev.stopPropagation();
+        node.onpointermove = null;
 
         node.classList.remove("drag");
+        node.releasePointerCapture(ev.pointerId);
         dragging = false;
     });
 }
